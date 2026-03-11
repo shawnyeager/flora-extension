@@ -400,9 +400,9 @@ export default defineContentScript({
     // Review Logic
     // ==========================================
     async function probeNip07(): Promise<{ pubkey: string } | { error: string }> {
+      // Use scripting.executeScript via background — bypasses postMessage entirely
       try {
-        const pubkey = await bridgeRequest('bloom:getPublicKey');
-        return pubkey ? { pubkey } : { error: 'Signer returned empty pubkey' };
+        return await browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE });
       } catch (err: any) {
         return { error: err.message };
       }

@@ -9,6 +9,7 @@ export default defineConfig({
       'offscreen',
       'activeTab',
       'storage',
+      'scripting',
     ],
     host_permissions: ['<all_urls>'],
     web_accessible_resources: [{

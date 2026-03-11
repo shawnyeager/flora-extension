@@ -46,6 +46,9 @@ export const MessageType = {
   // Result retrieval
   GET_RESULT: 'get_result',
 
+  // NIP-07 direct probe (via scripting.executeScript, no postMessage)
+  NIP07_PROBE: 'nip07_probe',
+
   // Confirmation flow
   GET_CONFIRM_DATA: 'get_confirm_data',
   CONFIRM_UPLOAD: 'confirm_upload',
@@ -198,6 +201,11 @@ export interface BackToPreviewMessage extends BaseMessage {
   type: typeof MessageType.BACK_TO_PREVIEW;
 }
 
+export interface Nip07ProbeMessage extends BaseMessage {
+  type: typeof MessageType.NIP07_PROBE;
+  tabId?: number;
+}
+
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
@@ -224,4 +232,5 @@ export type Message =
   | GetResultMessage
   | GetConfirmDataMessage
   | ConfirmUploadMessage
-  | BackToPreviewMessage;
+  | BackToPreviewMessage
+  | Nip07ProbeMessage;

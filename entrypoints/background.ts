@@ -99,6 +99,27 @@ async function closeOffscreenDocument() {
   await (browser as any).offscreen.closeDocument();
 }
 
+async function probeNip07Direct(tabId: number): Promise<{ pubkey: string } | { error: string }> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const nostr = (window as any).nostr;
+        if (!nostr) return { error: 'No NIP-07 signer found (window.nostr missing)' };
+        if (typeof nostr.getPublicKey !== 'function') return { error: 'window.nostr.getPublicKey is not a function' };
+        return nostr.getPublicKey().then(
+          (pk: any) => pk ? { pubkey: String(pk) } : { error: 'getPublicKey() returned empty' },
+          (err: any) => ({ error: String(err) }),
+        );
+      },
+    });
+    return results?.[0]?.result || { error: 'scripting.executeScript returned no result' };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
 export default defineBackground(() => {
   console.log('[background] service worker started');
 
@@ -123,6 +144,19 @@ export default defineBackground(() => {
         case MessageType.GET_RESULT:
           sendResponse({ uploadResult, publishResult });
           return false;
+
+        case MessageType.NIP07_PROBE: {
+          // Direct NIP-07 probe via scripting.executeScript — no postMessage bridge
+          const tabId = (message as any).tabId || recordingTabId || _sender.tab?.id;
+          if (!tabId) {
+            sendResponse({ error: 'No tab available for NIP-07 probe' });
+            return false;
+          }
+          probeNip07Direct(tabId)
+            .then((result) => sendResponse(result))
+            .catch((err) => sendResponse({ error: err.message }));
+          return true; // async
+        }
 
         case MessageType.START_RECORDING: {
           // Track which tab the user is on — review overlay and NIP-07 happen there
