@@ -1,0 +1,40 @@
+.bloom-controls {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(15, 15, 15, 0.9);
+  border-radius: 24px;
+  backdrop-filter: blur(8px);
+  z-index: 2147483647;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.bloom-timer {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+  font-variant-numeric: tabular-nums;
+}
+
+.bloom-btn {
+  border: none;
+  border-radius: 16px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bloom-btn-stop {
+  background: #e53e3e;
+  color: white;
+}
+
+.bloom-btn-stop:hover {
+  background: #c53030;
+}
