@@ -244,45 +244,29 @@ bloom/
 
 Build the core recording pipeline in the offscreen document.
 
+**Implementation note:** Mediabunny's `MediaStreamVideoTrackSource` and `MediaStreamAudioTrackSource` handle the entire capture-encode-mux pipeline from raw MediaStream tracks. This eliminated the need for separate codec probe, encoder, frame loop, and audio processing modules — the library handles all of this internally.
+
 **Tasks:**
-- [ ] Implement offscreen document lifecycle management in service worker
-  - Create on recording start, keep alive during recording
-  - `chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['DISPLAY_MEDIA', 'USER_MEDIA'] })`
-- [ ] Implement `getDisplayMedia()` in offscreen document
-  - Verify transient activation propagation from popup -> service worker -> offscreen document
-  - If blocked, fallback: open a small extension tab that calls `getDisplayMedia()` and transfers the stream to the offscreen doc
-  - Set `contentHint: "detail"` on the video track for AV1 screen content coding
-- [ ] Implement codec detection and fallback chain (`src/offscreen/codec-probe.ts`)
-  ```
-  async function selectBestCodec(): Promise<CodecConfig> {
-    // Try AV1 -> VP9 -> H.264
-    for (const config of CODEC_CONFIGS) {
-      const result = await VideoEncoder.isConfigSupported(config);
-      if (result.supported) return config;
-    }
-  }
-  ```
-- [ ] Implement `VideoEncoder` setup with selected codec (`src/offscreen/video-encoder.ts`)
-  - AV1: `'av01.0.04M.08'`, 1080p, 30fps, 1.5-3 Mbps, bitrateMode quantizer if available
-  - VP9: `'vp09.00.10.08'`, same settings
-  - H.264: `'avc1.640028'`, same settings at ~3-6 Mbps
-- [ ] Implement `AudioEncoder` for AAC (`src/offscreen/audio-encoder.ts`)
-  - Codec: `'mp4a.40.2'` (AAC-LC), 48kHz, stereo, 128kbps
-  - Verify `AudioEncoder.isConfigSupported()` — if AAC unavailable, try Opus
-- [ ] Implement Mediabunny muxing pipeline (`src/offscreen/muxer.ts`)
-  - Use `EncodedVideoPacketSource` + `EncodedAudioPacketSource`
-  - `BufferTarget` with `fastStart: 'in-memory'` for final MP4
-  - Wire encoder `output` callbacks to muxer `add()` calls
-- [ ] Implement frame capture loop using `requestVideoFrameCallback` or `VideoTrackReader`
-  - Feed `VideoFrame` objects to `VideoEncoder.encode()`
-  - Track timestamps for proper muxing
-- [ ] Implement microphone capture via `getUserMedia({ audio: true })`
-  - Capture `AudioData` via `AudioContext` + `MediaStreamTrackProcessor`
-  - Feed to `AudioEncoder.encode()`
-- [ ] Implement start/stop recording flow
-  - Start: acquire streams -> create encoders -> start muxer -> begin frame loop
-  - Stop: stop frame loop -> flush encoders -> finalize muxer -> return MP4 ArrayBuffer
-- [ ] Persist the finalized MP4 to IndexedDB for crash recovery / retry
+- [x] Implement offscreen document lifecycle management in service worker
+  - Create on recording start via `browser.offscreen.createDocument()`, close on reset
+- [x] Implement `getDisplayMedia()` in offscreen document
+  - Set `contentHint: "detail"` on the video track for screen content coding
+- [x] Implement codec detection and fallback chain
+  - Uses Mediabunny's `getFirstEncodableVideoCodec(['av1', 'vp9', 'avc'])`
+  - Uses `getFirstEncodableAudioCodec(['aac', 'opus'])` for audio
+- [x] Implement video encoding (via `MediaStreamVideoTrackSource`)
+  - AV1: 2 Mbps, VP9: 2.5 Mbps, H.264: 4 Mbps, all with `latencyMode: 'realtime'`
+- [x] Implement audio encoding (via `MediaStreamAudioTrackSource`)
+  - AAC or Opus at 128 kbps
+  - System audio + mic mixed via AudioContext when both available
+- [x] Implement Mediabunny muxing pipeline
+  - `Output` with `Mp4OutputFormat({ fastStart: 'in-memory' })` + `BufferTarget`
+- [x] Implement start/stop recording flow
+  - Start: getDisplayMedia -> getUserMedia -> create sources -> create output -> start
+  - Stop: close sources -> finalize output -> get buffer from target
+  - Handle stream ending (user stops sharing via browser UI)
+- [x] Persist the finalized MP4 to IndexedDB for crash recovery / retry
+  - SHA-256 hash as key, stores buffer + metadata
 
 **Acceptance criteria:**
 - [ ] Can record a screen (full screen, window, or tab) with microphone audio
@@ -298,24 +282,24 @@ Build the core recording pipeline in the offscreen document.
 Add webcam overlay composited into the screen recording.
 
 **Tasks:**
-- [ ] Implement webcam capture in offscreen document
+- [x] Implement webcam capture in offscreen document
   - `getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } })`
   - Separate stream from screen capture
-- [ ] Implement canvas compositing (`src/offscreen/compositor.ts`)
-  - Create `OffscreenCanvas` at screen recording resolution
+- [x] Implement canvas compositing (in `entrypoints/offscreen/main.ts`)
+  - Uses mediabunny's `CanvasSource` with `OffscreenCanvas` at screen resolution
   - Each frame: draw screen frame, then draw webcam frame as circle in bottom-left
-  - Webcam circle: 120px radius, 2px white border, positioned 24px from bottom-left
-  - Output composited frames as `VideoFrame` for the encoder
-- [ ] Handle webcam toggle (on/off during recording)
+  - Webcam circle: 60px radius, 2px white border, positioned 24px from bottom-left
+  - Falls back to `MediaStreamVideoTrackSource` when webcam unavailable
+- [x] Handle webcam toggle (on/off during recording)
   - When off, draw screen frame only (no webcam)
-  - State communicated from content script via service worker messages
-- [ ] Handle webcam position
+  - State communicated via TOGGLE_WEBCAM message through service worker
+- [x] Handle webcam position
   - Default: bottom-left circle
   - For v1, position is fixed (configurable position is out of scope)
-- [ ] Handle frame synchronization
-  - Screen and webcam may deliver frames at different rates
-  - Use the screen frame rate as the master clock
-  - Draw the most recent webcam frame onto each screen frame
+- [x] Handle frame synchronization
+  - Screen and webcam rendered via HTMLVideoElement, drawn at screen's frame rate
+  - requestAnimationFrame loop throttled to ~30fps
+  - Always draws most recent webcam frame onto current screen frame
 
 **Acceptance criteria:**
 - [ ] Recorded video shows webcam circle overlay in bottom-left

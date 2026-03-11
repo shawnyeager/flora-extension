@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bloom - Grant Permissions</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #0f0f0f;
+      color: #e8e8e8;
+    }
+    .container { text-align: center; padding: 32px; }
+    .status { font-size: 18px; margin-bottom: 16px; }
+    .sub { font-size: 14px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="status" id="status">Requesting camera & microphone access...</div>
+    <div class="sub" id="sub">Please allow access when prompted.</div>
+  </div>
+  <script src="./main.ts" type="module"></script>
+</body>
+</html>
