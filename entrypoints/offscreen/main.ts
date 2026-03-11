@@ -23,6 +23,9 @@ let target: BufferTarget | null = null;
 let displayStream: MediaStream | null = null;
 let micStream: MediaStream | null = null;
 let recordingStartTime = 0;
+let isPaused = false;
+let pauseStartTime = 0;
+let totalPausedMs = 0;
 
 async function startCapture() {
   try {
@@ -112,6 +115,9 @@ async function startCapture() {
 
     await output.start();
     recordingStartTime = Date.now();
+    isPaused = false;
+    pauseStartTime = 0;
+    totalPausedMs = 0;
 
     // Handle stream ending
     videoTrack.addEventListener('ended', () => {
@@ -145,7 +151,12 @@ async function stopCapture() {
   micStream = null;
 
   try {
-    const duration = (Date.now() - recordingStartTime) / 1000;
+    // Account for paused time in duration
+    if (isPaused) {
+      totalPausedMs += Date.now() - pauseStartTime;
+      isPaused = false;
+    }
+    const duration = (Date.now() - recordingStartTime - totalPausedMs) / 1000;
 
     videoSource?.close();
     audioSource?.close();
@@ -421,6 +432,30 @@ browser.runtime.onMessage.addListener(
         stopCapture();
         sendResponse({ ok: true });
         return false;
+
+      case MessageType.PAUSE_CAPTURE: {
+        if (videoSource && !isPaused) {
+          videoSource.pause();
+          audioSource?.pause();
+          isPaused = true;
+          pauseStartTime = Date.now();
+          console.log('[offscreen] capture paused');
+        }
+        sendResponse({ ok: true });
+        return false;
+      }
+
+      case MessageType.RESUME_CAPTURE: {
+        if (videoSource && isPaused) {
+          videoSource.resume();
+          audioSource?.resume();
+          totalPausedMs += Date.now() - pauseStartTime;
+          isPaused = false;
+          console.log('[offscreen] capture resumed');
+        }
+        sendResponse({ ok: true });
+        return false;
+      }
 
       case MessageType.TOGGLE_MIC: {
         const muted = (message as any).muted;

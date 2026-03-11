@@ -213,6 +213,24 @@ export default defineBackground(() => {
           setState('error');
           return false;
 
+        case MessageType.PAUSE_RECORDING: {
+          browser.runtime.sendMessage({
+            type: MessageType.PAUSE_CAPTURE,
+            target: 'offscreen',
+          }).catch(console.error);
+          sendResponse({ ok: true });
+          return false;
+        }
+
+        case MessageType.RESUME_RECORDING: {
+          browser.runtime.sendMessage({
+            type: MessageType.RESUME_CAPTURE,
+            target: 'offscreen',
+          }).catch(console.error);
+          sendResponse({ ok: true });
+          return false;
+        }
+
         case MessageType.TOGGLE_MIC: {
           browser.runtime.sendMessage({
             type: MessageType.TOGGLE_MIC,

@@ -1,18 +1,44 @@
 /* Webcam preview bubble */
 .bloom-webcam {
   position: fixed;
-  bottom: 80px;
-  left: 24px;
   width: 120px;
   height: 120px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 2147483646;
-  cursor: pointer;
+  cursor: grab;
   background: #1a1a1a;
   display: none;
+  transition: width 0.3s ease, height 0.3s ease,
+              top 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease;
+}
+
+.bloom-webcam.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+
+/* Corner snap positions */
+.bloom-webcam.pos-bl { bottom: 80px; left: 24px; right: auto; top: auto; }
+.bloom-webcam.pos-br { bottom: 80px; right: 24px; left: auto; top: auto; }
+.bloom-webcam.pos-tl { top: 24px; left: 24px; right: auto; bottom: auto; }
+.bloom-webcam.pos-tr { top: 24px; right: 24px; left: auto; bottom: auto; }
+
+/* Collapsed camera-off state */
+.bloom-webcam.collapsed {
+  width: 40px;
+  height: 40px;
+}
+
+.bloom-webcam.collapsed .bloom-webcam-off {
+  font-size: 16px;
+}
+
+.bloom-webcam.collapsed .bloom-webcam-off svg {
+  width: 16px;
+  height: 16px;
 }
 
 .bloom-webcam video {
@@ -32,6 +58,46 @@
   font-size: 32px;
 }
 
+.bloom-webcam-off svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Camera toggle badge on bubble */
+.bloom-webcam-toggle {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(15, 15, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+  color: #ccc;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bloom-webcam-toggle:hover {
+  background: rgba(30, 30, 30, 0.95);
+  color: #fff;
+}
+
+.bloom-webcam-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bloom-webcam.collapsed .bloom-webcam-toggle {
+  bottom: -4px;
+  right: -4px;
+}
+
 /* Controls bar */
 .bloom-controls {
   position: fixed;
@@ -40,9 +106,10 @@
   transform: translateX(-50%);
   display: none;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 10px;
+  padding: 8px 14px;
   background: rgba(15, 15, 15, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 24px;
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -57,6 +124,12 @@
   border-radius: 50%;
   background: #e53e3e;
   animation: bloom-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.bloom-rec-dot.paused {
+  animation: none;
+  opacity: 0.4;
 }
 
 @keyframes bloom-pulse {
@@ -72,30 +145,19 @@
   min-width: 42px;
 }
 
-.bloom-btn {
-  border: none;
-  border-radius: 16px;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.bloom-btn-stop {
-  background: #e53e3e;
-  color: white;
-}
-
-.bloom-btn-stop:hover {
-  background: #c53030;
+/* Divider between timer and action buttons */
+.bloom-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
 }
 
 .bloom-btn-icon {
-  background: transparent;
-  border: 1px solid #444;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #ccc;
-  padding: 6px 10px;
+  padding: 0;
   border-radius: 50%;
   font-size: 16px;
   line-height: 1;
@@ -104,16 +166,47 @@
   justify-content: center;
   width: 32px;
   height: 32px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .bloom-btn-icon:hover {
-  border-color: #666;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
   color: #fff;
+}
+
+.bloom-btn-icon:active {
+  transform: scale(0.92);
 }
 
 .bloom-btn-icon.active {
   border-color: #e53e3e;
   color: #e53e3e;
+}
+
+.bloom-btn-stop {
+  background: #e53e3e;
+  border: 1px solid #e53e3e;
+  color: white;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bloom-btn-stop:hover {
+  background: #c53030;
+  border-color: #c53030;
+}
+
+.bloom-btn-stop:active {
+  transform: scale(0.92);
 }
 
 /* ==========================================

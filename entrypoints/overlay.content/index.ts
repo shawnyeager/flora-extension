@@ -1,5 +1,6 @@
 import './style.css';
 import { MessageType } from '@/utils/messages';
+import { Icons } from '@/utils/icons';
 import type { ExtensionState } from '@/utils/state';
 
 export default defineContentScript({
@@ -18,6 +19,22 @@ export default defineContentScript({
     let webcamAcquiring = false;
     let videoLoaded = false;
     let confirmLocked = false;
+
+    // Pause
+    let paused = false;
+    let pausedAccumulator = 0;
+    let pauseTimestamp = 0;
+
+    // Webcam
+    let webcamOn = true;
+
+    // Drag
+    type Corner = 'bl' | 'br' | 'tl' | 'tr';
+    let bubbleCorner: Corner = 'bl';
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let bubbleStartRect: DOMRect | null = null;
 
     ctx.onInvalidated(() => {
       webcamAborted = true;
@@ -57,7 +74,7 @@ export default defineContentScript({
 
         // --- Webcam bubble ---
         const webcamBubble = document.createElement('div');
-        webcamBubble.className = 'bloom-webcam';
+        webcamBubble.className = 'bloom-webcam pos-bl';
 
         const webcamVideoEl = document.createElement('video');
         webcamVideoEl.autoplay = true;
@@ -66,21 +83,85 @@ export default defineContentScript({
 
         const webcamOff = document.createElement('div');
         webcamOff.className = 'bloom-webcam-off';
-        webcamOff.textContent = '\u{1F4F7}';
+        webcamOff.innerHTML = Icons.cameraOff;
 
-        webcamBubble.append(webcamVideoEl, webcamOff);
-        webcamBubble.addEventListener('click', () => {
-          const isOn = webcamVideoEl.style.display !== 'none';
-          if (isOn) {
+        // Camera toggle badge
+        const camToggle = document.createElement('button');
+        camToggle.className = 'bloom-webcam-toggle';
+        camToggle.innerHTML = Icons.cameraOff;
+        camToggle.title = 'Turn camera off';
+
+        camToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          webcamOn = !webcamOn;
+          if (!webcamOn) {
             webcamVideoEl.style.display = 'none';
             webcamOff.style.display = 'flex';
+            webcamBubble.classList.add('collapsed');
+            camToggle.innerHTML = Icons.camera;
+            camToggle.title = 'Turn camera on';
+            // Update controls bar camera btn
+            const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
+            if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
             webcamVideoEl.style.display = 'block';
             webcamOff.style.display = 'none';
+            webcamBubble.classList.remove('collapsed');
+            camToggle.innerHTML = Icons.cameraOff;
+            camToggle.title = 'Turn camera off';
+            const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
+            if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
           }
         });
+
+        // --- Drag handlers ---
+        webcamBubble.addEventListener('pointerdown', (e: PointerEvent) => {
+          if ((e.target as HTMLElement).closest('.bloom-webcam-toggle')) return;
+          isDragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          bubbleStartRect = webcamBubble.getBoundingClientRect();
+          webcamBubble.classList.add('dragging');
+          webcamBubble.classList.remove('pos-bl', 'pos-br', 'pos-tl', 'pos-tr');
+          webcamBubble.style.top = `${bubbleStartRect.top}px`;
+          webcamBubble.style.left = `${bubbleStartRect.left}px`;
+          webcamBubble.style.right = 'auto';
+          webcamBubble.style.bottom = 'auto';
+          webcamBubble.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        });
+
+        webcamBubble.addEventListener('pointermove', (e: PointerEvent) => {
+          if (!isDragging || !bubbleStartRect) return;
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          const maxX = window.innerWidth - bubbleStartRect.width;
+          const maxY = window.innerHeight - bubbleStartRect.height;
+          webcamBubble.style.left = `${Math.max(0, Math.min(bubbleStartRect.left + dx, maxX))}px`;
+          webcamBubble.style.top = `${Math.max(0, Math.min(bubbleStartRect.top + dy, maxY))}px`;
+        });
+
+        webcamBubble.addEventListener('pointerup', (e: PointerEvent) => {
+          if (!isDragging) return;
+          isDragging = false;
+          webcamBubble.classList.remove('dragging');
+          webcamBubble.releasePointerCapture(e.pointerId);
+          const rect = webcamBubble.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const isLeft = cx < window.innerWidth / 2;
+          const isTop = cy < window.innerHeight / 2;
+          bubbleCorner = ((isTop ? 't' : 'b') + (isLeft ? 'l' : 'r')) as Corner;
+          webcamBubble.style.top = '';
+          webcamBubble.style.left = '';
+          webcamBubble.style.right = '';
+          webcamBubble.style.bottom = '';
+          webcamBubble.classList.add(`pos-${bubbleCorner}`);
+        });
+
+        webcamBubble.append(webcamVideoEl, webcamOff, camToggle);
 
         // --- Controls bar ---
         const controls = document.createElement('div');
@@ -93,26 +174,63 @@ export default defineContentScript({
         timer.className = 'bloom-timer';
         timer.textContent = '00:00';
 
+        const divider = document.createElement('div');
+        divider.className = 'bloom-divider';
+
+        const pauseBtn = document.createElement('button');
+        pauseBtn.className = 'bloom-btn-icon bloom-btn-pause';
+        pauseBtn.innerHTML = Icons.pause;
+        pauseBtn.title = 'Pause recording';
+        pauseBtn.addEventListener('click', () => {
+          paused = !paused;
+          if (paused) {
+            pauseTimestamp = Date.now();
+            pauseBtn.innerHTML = Icons.play;
+            pauseBtn.title = 'Resume recording';
+            pauseBtn.classList.add('active');
+            recDot.classList.add('paused');
+            browser.runtime.sendMessage({ type: MessageType.PAUSE_RECORDING });
+          } else {
+            pausedAccumulator += Date.now() - pauseTimestamp;
+            pauseBtn.innerHTML = Icons.pause;
+            pauseBtn.title = 'Pause recording';
+            pauseBtn.classList.remove('active');
+            recDot.classList.remove('paused');
+            browser.runtime.sendMessage({ type: MessageType.RESUME_RECORDING });
+          }
+        });
+
         const micBtn = document.createElement('button');
         micBtn.className = 'bloom-btn-icon';
-        micBtn.textContent = '\u{1F3A4}';
-        micBtn.title = 'Toggle microphone';
+        micBtn.innerHTML = Icons.mic;
+        micBtn.title = 'Mute microphone';
         micBtn.addEventListener('click', () => {
           micMuted = !micMuted;
+          micBtn.innerHTML = micMuted ? Icons.micOff : Icons.mic;
           micBtn.classList.toggle('active', micMuted);
-          micBtn.title = micMuted ? 'Microphone muted' : 'Toggle microphone';
+          micBtn.title = micMuted ? 'Unmute microphone' : 'Mute microphone';
           browser.runtime.sendMessage({ type: MessageType.TOGGLE_MIC, muted: micMuted });
         });
 
+        const camBtn = document.createElement('button');
+        camBtn.className = 'bloom-btn-icon bloom-btn-cam';
+        camBtn.innerHTML = Icons.camera;
+        camBtn.title = 'Turn camera off';
+        camBtn.addEventListener('click', () => {
+          // Delegate to the bubble's toggle — keeps state in sync
+          camToggle.click();
+        });
+
         const stopBtn = document.createElement('button');
-        stopBtn.className = 'bloom-btn bloom-btn-stop';
-        stopBtn.textContent = 'Stop';
+        stopBtn.className = 'bloom-btn-stop';
+        stopBtn.innerHTML = Icons.stop;
+        stopBtn.title = 'Stop recording';
         stopBtn.addEventListener('click', () => {
           stopEverything();
           browser.runtime.sendMessage({ type: MessageType.STOP_RECORDING });
         });
 
-        controls.append(recDot, timer, micBtn, stopBtn);
+        controls.append(recDot, timer, divider, pauseBtn, micBtn, camBtn, stopBtn);
         wrapper.append(webcamBubble, controls);
         container.append(wrapper);
         return wrapper;
@@ -129,8 +247,12 @@ export default defineContentScript({
     // ==========================================
     function startTimer() {
       recordingStartTime = Date.now();
+      pausedAccumulator = 0;
+      paused = false;
+      pauseTimestamp = 0;
       timerInterval = setInterval(() => {
-        const elapsed = (Date.now() - recordingStartTime) / 1000;
+        if (paused) return;
+        const elapsed = (Date.now() - recordingStartTime - pausedAccumulator) / 1000;
         const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
         const s = Math.floor(elapsed % 60).toString().padStart(2, '0');
         const timerEl = ui.shadow.querySelector('.bloom-timer') as HTMLElement;
@@ -161,12 +283,16 @@ export default defineContentScript({
         videoEl.srcObject = stream;
         videoEl.style.display = 'block';
         offEl.style.display = 'none';
+        webcamOn = true;
+        bubble.classList.remove('collapsed');
         bubble.style.display = 'block';
       } catch {
         webcamAcquiring = false;
         if (webcamAborted) return;
         videoEl.style.display = 'none';
         offEl.style.display = 'flex';
+        webcamOn = false;
+        bubble.classList.add('collapsed');
         bubble.style.display = 'block';
       }
     }
@@ -183,6 +309,9 @@ export default defineContentScript({
       if (controls) controls.style.display = 'none';
       if (bubble) bubble.style.display = 'none';
       stopTimer();
+      paused = false;
+      pausedAccumulator = 0;
+      pauseTimestamp = 0;
     }
 
     // ==========================================
@@ -349,7 +478,6 @@ export default defineContentScript({
     // Review Logic
     // ==========================================
     async function probeNip07(): Promise<{ pubkey: string } | { error: string }> {
-      // Use scripting.executeScript via background — bypasses postMessage entirely
       try {
         return await browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE });
       } catch (err: any) {
@@ -376,7 +504,6 @@ export default defineContentScript({
       const target = panel.querySelector(`.${cls}`) as HTMLElement;
       if (target) target.style.display = 'flex';
 
-      // Show video only for preview/confirm
       const showMedia = cls === 'br-preview' || cls === 'br-confirm';
       const video = panel.querySelector('.br-video') as HTMLElement;
       const meta = panel.querySelector('.br-meta') as HTMLElement;
@@ -435,14 +562,12 @@ export default defineContentScript({
       ]);
       if (!settings) return;
 
-      // Meta
       const parts: string[] = [];
       if (settings.fileSize) parts.push(fmtBytes(settings.fileSize));
       if (settings.duration) parts.push(fmtDuration(settings.duration));
       const meta = panel.querySelector('.br-meta') as HTMLElement;
       if (meta) meta.textContent = parts.join(' \u00b7 ');
 
-      // Destination
       (panel.querySelector('.br-server') as HTMLElement).textContent = settings.server || 'Not configured';
 
       const relayRow = panel.querySelector('.br-relay-row') as HTMLElement;

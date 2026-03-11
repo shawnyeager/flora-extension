@@ -1,15 +1,19 @@
 import type { ExtensionState } from './state';
 
 export const MessageType = {
-  // Popup -> Background
+  // Popup/Content -> Background
   START_RECORDING: 'start_recording',
   STOP_RECORDING: 'stop_recording',
+  PAUSE_RECORDING: 'pause_recording',
+  RESUME_RECORDING: 'resume_recording',
   GET_STATE: 'get_state',
   RESET_STATE: 'reset_state',
 
   // Background -> Offscreen
   START_CAPTURE: 'start_capture',
   STOP_CAPTURE: 'stop_capture',
+  PAUSE_CAPTURE: 'pause_capture',
+  RESUME_CAPTURE: 'resume_capture',
 
   // Offscreen -> Background
   CAPTURE_READY: 'capture_ready',
@@ -73,6 +77,14 @@ export interface StopRecordingMessage extends BaseMessage {
   type: typeof MessageType.STOP_RECORDING;
 }
 
+export interface PauseRecordingMessage extends BaseMessage {
+  type: typeof MessageType.PAUSE_RECORDING;
+}
+
+export interface ResumeRecordingMessage extends BaseMessage {
+  type: typeof MessageType.RESUME_RECORDING;
+}
+
 export interface GetStateMessage extends BaseMessage {
   type: typeof MessageType.GET_STATE;
 }
@@ -88,6 +100,16 @@ export interface StartCaptureMessage extends BaseMessage {
 
 export interface StopCaptureMessage extends BaseMessage {
   type: typeof MessageType.STOP_CAPTURE;
+  target: 'offscreen';
+}
+
+export interface PauseCaptureMessage extends BaseMessage {
+  type: typeof MessageType.PAUSE_CAPTURE;
+  target: 'offscreen';
+}
+
+export interface ResumeCaptureMessage extends BaseMessage {
+  type: typeof MessageType.RESUME_CAPTURE;
   target: 'offscreen';
 }
 
@@ -209,10 +231,14 @@ export interface Nip07ProbeMessage extends BaseMessage {
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
+  | PauseRecordingMessage
+  | ResumeRecordingMessage
   | GetStateMessage
   | ResetStateMessage
   | StartCaptureMessage
   | StopCaptureMessage
+  | PauseCaptureMessage
+  | ResumeCaptureMessage
   | CaptureReadyMessage
   | CaptureErrorMessage
   | RecordingCompleteMessage
