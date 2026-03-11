@@ -11,6 +11,14 @@ let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let recordingTabId: number | null = null;
 
+/** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
+async function findScriptableTab(): Promise<number | null> {
+  if (recordingTabId) return recordingTabId;
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (active?.id && active.url && /^https?:/.test(active.url)) return active.id;
+  const tabs = await browser.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  return tabs[0]?.id ?? null;
+}
 
 function setState(state: ExtensionState) {
   currentState = state;
@@ -149,16 +157,13 @@ export default defineBackground(() => {
           return false;
 
         case MessageType.NIP07_PROBE: {
-          // Direct NIP-07 probe via scripting.executeScript — no postMessage bridge
-          const tabId = (message as any).tabId || recordingTabId || _sender.tab?.id;
-          if (!tabId) {
-            sendResponse({ error: 'No tab available for NIP-07 probe' });
-            return false;
-          }
-          probeNip07Direct(tabId)
-            .then((result) => sendResponse(result))
+          findScriptableTab()
+            .then((tabId) => {
+              if (!tabId) return sendResponse({ error: 'No web tab available for NIP-07 probe' });
+              return probeNip07Direct(tabId).then((r) => sendResponse(r));
+            })
             .catch((err) => sendResponse({ error: err.message }));
-          return true; // async
+          return true;
         }
 
         case MessageType.START_RECORDING: {
@@ -321,25 +326,21 @@ export default defineBackground(() => {
         }
 
         case MessageType.NIP07_GET_PUBKEY: {
-          const tabId = recordingTabId || _sender.tab?.id;
-          if (!tabId) {
-            sendResponse({ ok: false, error: 'No tab available for NIP-07' });
-            return false;
-          }
-          getPubkeyDirect(tabId)
-            .then((result) => sendResponse(result))
+          findScriptableTab()
+            .then((tabId) => {
+              if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-07' });
+              return getPubkeyDirect(tabId).then((r) => sendResponse(r));
+            })
             .catch((err) => sendResponse({ ok: false, error: err.message }));
           return true;
         }
 
         case MessageType.NIP07_SIGN: {
-          const tabId = recordingTabId || _sender.tab?.id;
-          if (!tabId) {
-            sendResponse({ ok: false, error: 'No tab available for NIP-07' });
-            return false;
-          }
-          signEventDirect(tabId, (message as any).event)
-            .then((result) => sendResponse(result))
+          findScriptableTab()
+            .then((tabId) => {
+              if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-07' });
+              return signEventDirect(tabId, (message as any).event).then((r) => sendResponse(r));
+            })
             .catch((err) => sendResponse({ ok: false, error: err.message }));
           return true;
         }

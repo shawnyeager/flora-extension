@@ -8,6 +8,7 @@ export default defineConfig({
     permissions: [
       'offscreen',
       'activeTab',
+      'tabs',
       'storage',
       'scripting',
     ],
