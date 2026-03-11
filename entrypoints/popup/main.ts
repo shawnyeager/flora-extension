@@ -16,6 +16,17 @@ btnStop.className = 'btn-stop';
 btnStop.textContent = 'Stop Recording';
 btnStop.style.display = 'none';
 
+// Preview state elements
+const previewVideo = document.createElement('video');
+previewVideo.className = 'preview-video';
+previewVideo.controls = true;
+previewVideo.style.display = 'none';
+
+const btnUpload = document.createElement('button');
+btnUpload.className = 'btn-record';
+btnUpload.textContent = 'Upload & Share';
+btnUpload.style.display = 'none';
+
 const btnDownload = document.createElement('button');
 btnDownload.className = 'btn-stop';
 btnDownload.textContent = 'Download MP4';
@@ -33,7 +44,7 @@ btnRetry.style.display = 'none';
 
 const btnReset = document.createElement('button');
 btnReset.className = 'btn-reset';
-btnReset.textContent = 'New Recording';
+btnReset.textContent = 'Discard';
 btnReset.style.display = 'none';
 
 const resultLink = document.createElement('a');
@@ -45,7 +56,7 @@ const status = document.createElement('div');
 status.className = 'status';
 status.textContent = 'Ready';
 
-app.append(logo, btnRecord, btnStop, btnDownload, btnCopy, btnRetry, btnReset, resultLink, status);
+app.append(logo, btnRecord, btnStop, previewVideo, btnUpload, btnDownload, btnCopy, btnRetry, btnReset, resultLink, status);
 
 btnRecord.addEventListener('click', async () => {
   const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
@@ -60,6 +71,10 @@ btnRecord.addEventListener('click', async () => {
 
 btnStop.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: MessageType.STOP_RECORDING });
+});
+
+btnUpload.addEventListener('click', async () => {
+  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD });
 });
 
 btnDownload.addEventListener('click', async () => {
@@ -95,10 +110,12 @@ btnCopy.addEventListener('click', async () => {
 });
 
 btnRetry.addEventListener('click', async () => {
-  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD, target: 'offscreen' });
+  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD });
 });
 
 btnReset.addEventListener('click', async () => {
+  previewVideo.src = '';
+  previewVideo.style.display = 'none';
   await browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
 });
 
@@ -125,6 +142,7 @@ const STATE_LABELS: Record<ExtensionState, string> = {
   countdown: 'Starting...',
   recording: 'Recording',
   finalizing: 'Saving...',
+  preview: 'Review your recording',
   uploading: 'Uploading...',
   publishing: 'Publishing to Nostr...',
   complete: 'Done!',
@@ -136,11 +154,35 @@ async function updateUI(state: ExtensionState) {
 
   btnRecord.style.display = state === 'idle' ? 'block' : 'none';
   btnStop.style.display = state === 'recording' ? 'block' : 'none';
-  btnDownload.style.display = state === 'complete' ? 'block' : 'none';
+  btnUpload.style.display = state === 'preview' ? 'block' : 'none';
+  btnDownload.style.display = ['preview', 'complete'].includes(state) ? 'block' : 'none';
   btnCopy.style.display = state === 'complete' ? 'block' : 'none';
   btnRetry.style.display = state === 'error' ? 'block' : 'none';
-  btnReset.style.display = ['complete', 'error'].includes(state) ? 'block' : 'none';
+  btnReset.style.display = ['preview', 'complete', 'error'].includes(state) ? 'block' : 'none';
   resultLink.style.display = 'none';
+
+  if (state === 'preview') {
+    btnReset.textContent = 'Discard';
+    // Load recording for playback
+    if (!previewVideo.src) {
+      try {
+        const result = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING });
+        if (result?.dataUrl) {
+          previewVideo.src = result.dataUrl;
+          previewVideo.style.display = 'block';
+        }
+      } catch {
+        // Offscreen may not be ready yet
+      }
+    } else {
+      previewVideo.style.display = 'block';
+    }
+  } else {
+    if (state !== 'uploading' && state !== 'publishing') {
+      previewVideo.style.display = 'none';
+    }
+    btnReset.textContent = 'New Recording';
+  }
 
   if (state === 'complete') {
     const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });

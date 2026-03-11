@@ -193,12 +193,7 @@ export default defineBackground(() => {
         case MessageType.RECORDING_COMPLETE: {
           const msg = message as any;
           console.log(`[background] recording complete: ${msg.size} bytes, ${msg.duration}s`);
-          // Auto-trigger upload
-          setState('uploading');
-          browser.runtime.sendMessage({
-            type: MessageType.START_UPLOAD,
-            target: 'offscreen',
-          }).catch(console.error);
+          setState('preview');
           return false;
         }
 

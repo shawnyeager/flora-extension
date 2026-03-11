@@ -10,7 +10,9 @@
  *   countdown -> recording        (countdown finished)
  *   countdown -> idle             (user cancelled)
  *   recording -> finalizing       (user clicks Stop / stream ends)
- *   finalizing -> uploading       (MP4 ready)
+ *   finalizing -> preview         (MP4 ready, user reviews)
+ *   preview -> uploading          (user clicks Upload & Share)
+ *   preview -> idle               (user discards)
  *   uploading -> publishing       (upload complete)
  *   uploading -> error            (upload failed)
  *   publishing -> complete        (note published)
@@ -25,6 +27,7 @@ export type ExtensionState =
   | 'countdown'
   | 'recording'
   | 'finalizing'
+  | 'preview'
   | 'uploading'
   | 'publishing'
   | 'complete'
@@ -37,7 +40,8 @@ export const TRANSITIONS: Record<ExtensionState, ExtensionState[]> = {
   awaiting_media: ['countdown', 'idle'],
   countdown: ['recording', 'idle'],
   recording: ['finalizing'],
-  finalizing: ['uploading'],
+  finalizing: ['preview'],
+  preview: ['uploading', 'idle'],
   uploading: ['publishing', 'error'],
   publishing: ['complete'],
   complete: ['idle'],
