@@ -28,9 +28,13 @@ previewVideo.className = 'preview-video';
 previewVideo.controls = true;
 previewVideo.style.display = 'none';
 
+const previewInfo = document.createElement('div');
+previewInfo.className = 'preview-info';
+previewInfo.style.display = 'none';
+
 const btnUpload = document.createElement('button');
 btnUpload.className = 'btn-record';
-btnUpload.textContent = 'Upload & Share';
+btnUpload.textContent = 'Upload & Share\u2026';
 btnUpload.style.display = 'none';
 
 const btnDownload = document.createElement('button');
@@ -86,7 +90,7 @@ settingsLink.href = '#';
 settingsLink.style.display = 'none';
 
 app.append(
-  logo, btnRecord, btnStop, previewVideo, btnUpload, btnDownload,
+  logo, btnRecord, btnStop, previewVideo, previewInfo, btnUpload, btnDownload,
   confirmSection, btnCopy, btnRetry, btnReset, resultLink, status, settingsLink,
 );
 
@@ -120,9 +124,7 @@ btnStop.addEventListener('click', async () => {
 });
 
 btnUpload.addEventListener('click', async () => {
-  // Go to confirming state — NOT directly to uploading
-  await browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
-  // State transition is handled by background; UI updates via STATE_CHANGED
+  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD });
 });
 
 btnDownload.addEventListener('click', async () => {
@@ -253,6 +255,7 @@ async function updateUI(state: ExtensionState) {
   // Visibility
   btnRecord.style.display = state === 'idle' ? 'block' : 'none';
   btnStop.style.display = state === 'recording' ? 'block' : 'none';
+  previewInfo.style.display = state === 'preview' ? 'block' : 'none';
   btnUpload.style.display = state === 'preview' ? 'block' : 'none';
   btnDownload.style.display = ['preview', 'confirming', 'complete'].includes(state) ? 'block' : 'none';
   confirmSection.style.display = state === 'confirming' ? 'block' : 'none';
@@ -285,6 +288,11 @@ async function updateUI(state: ExtensionState) {
     btnReset.textContent = 'New Recording';
   }
 
+  // Show destination summary on preview screen
+  if (state === 'preview') {
+    await populatePreviewInfo();
+  }
+
   // Populate confirmation screen
   if (state === 'confirming') {
     await populateConfirmScreen();
@@ -300,6 +308,54 @@ async function updateUI(state: ExtensionState) {
       resultLink.style.display = 'block';
     }
   }
+}
+
+async function populatePreviewInfo() {
+  const data = await browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
+  if (!data) {
+    previewInfo.textContent = '';
+    return;
+  }
+
+  const parts: string[] = [];
+  if (data.fileSize) parts.push(formatBytes(data.fileSize));
+  if (data.duration) parts.push(formatDuration(data.duration));
+
+  const meta = parts.length ? parts.join(' \u00b7 ') : '';
+  const server = data.server || 'No server configured';
+  const relays = data.relays?.length ? data.relays.join(', ') : 'No relays configured';
+  const identity = data.signerAvailable && data.npub
+    ? `Signing as ${truncateNpub(data.npub)}`
+    : 'No signer detected';
+
+  previewInfo.innerHTML = '';
+
+  if (meta) {
+    const metaLine = document.createElement('div');
+    metaLine.className = 'preview-info-meta';
+    metaLine.textContent = meta;
+    previewInfo.append(metaLine);
+  }
+
+  const serverLine = document.createElement('div');
+  serverLine.className = 'preview-info-line';
+  serverLine.textContent = `Server: ${server}`;
+  previewInfo.append(serverLine);
+
+  if (data.publishToNostr) {
+    const relayLine = document.createElement('div');
+    relayLine.className = 'preview-info-line';
+    relayLine.textContent = `Relays: ${relays}`;
+    previewInfo.append(relayLine);
+  }
+
+  const idLine = document.createElement('div');
+  idLine.className = 'preview-info-line';
+  if (!data.signerAvailable) {
+    idLine.className = 'preview-info-line preview-info-warn';
+  }
+  idLine.textContent = identity;
+  previewInfo.append(idLine);
 }
 
 async function populateConfirmScreen() {

@@ -135,6 +135,34 @@ body {
   color: #888;
 }
 
+/* Preview info — shows destination before user clicks upload */
+.preview-info {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-info-meta {
+  font-size: 13px;
+  color: #a0aec0;
+  margin-bottom: 2px;
+}
+
+.preview-info-line {
+  font-size: 12px;
+  color: #718096;
+  word-break: break-all;
+}
+
+.preview-info-warn {
+  color: #f6ad55;
+}
+
 /* Confirmation screen */
 .confirm-section {
   width: 100%;

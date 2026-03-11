@@ -278,16 +278,11 @@ export default defineBackground(() => {
         }
 
         case MessageType.START_UPLOAD: {
-          // Manual retry from popup (or auto-trigger won't hit here since background is sender)
-          setState('uploading');
-          ensureOffscreenDocument()
-            .then(() =>
-              browser.runtime.sendMessage({
-                type: MessageType.START_UPLOAD,
-                target: 'offscreen',
-              }),
-            )
-            .catch(console.error);
+          if (message.target === 'offscreen') return false; // not for us
+          // From popup "Upload & Share" — go to confirming, not directly uploading
+          if (currentState === 'preview') {
+            setState('confirming');
+          }
           sendResponse({ ok: true });
           return false;
         }
@@ -302,7 +297,6 @@ export default defineBackground(() => {
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          if (currentState === 'preview') setState('confirming');
           getSettings()
             .then((settings) => {
               const nip07Available = cachedNip07 !== null && 'pubkey' in cachedNip07;
