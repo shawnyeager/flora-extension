@@ -1,11 +1,15 @@
 import { MessageType, type Message } from '@/utils/messages';
 import { type ExtensionState } from '@/utils/state';
+import { getSettings } from '@/utils/settings';
 
 const OFFSCREEN_PATH = '/offscreen.html';
 
 let currentState: ExtensionState = 'idle';
 let uploadResult: { url: string; sha256: string; size: number } | null = null;
 let publishResult: { noteId: string; blossomUrl: string } | null = null;
+let cachedNip07: { pubkey: string } | { error: string } | null = null;
+let lastRecordingMeta: { size: number; duration: number } | null = null;
+let pendingPublishToNostr = true;
 
 async function relayToContentScript(message: Message): Promise<any> {
   // Try active tab first, fall back to any tab
@@ -32,6 +36,21 @@ async function relayToContentScript(message: Message): Promise<any> {
   }
 
   throw new Error('No content script available for NIP-07 signing');
+}
+
+function probeNip07() {
+  cachedNip07 = null;
+  relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
+    .then((result) => {
+      if (result?.ok !== false && result?.pubkey) {
+        cachedNip07 = { pubkey: result.pubkey };
+      } else {
+        cachedNip07 = { error: result?.error || 'Unknown NIP-07 error' };
+      }
+    })
+    .catch((err) => {
+      cachedNip07 = { error: err.message };
+    });
 }
 
 function setState(state: ExtensionState) {
@@ -193,7 +212,10 @@ export default defineBackground(() => {
         case MessageType.RECORDING_COMPLETE: {
           const msg = message as any;
           console.log(`[background] recording complete: ${msg.size} bytes, ${msg.duration}s`);
+          lastRecordingMeta = { size: msg.size, duration: msg.duration };
           setState('preview');
+          // Proactively probe NIP-07 so confirmation screen has data ready
+          probeNip07();
           return false;
         }
 
@@ -211,17 +233,21 @@ export default defineBackground(() => {
         case MessageType.UPLOAD_COMPLETE: {
           const msg = message as any;
           console.log(`[background] upload complete: ${msg.url}`);
-          // Store upload result for publishing
           uploadResult = { url: msg.url, sha256: msg.sha256, size: msg.size };
-          setState('publishing');
-          // Trigger Nostr publishing
-          browser.runtime.sendMessage({
-            type: MessageType.PUBLISH_NOTE,
-            target: 'offscreen',
-            blossomUrl: msg.url,
-            sha256: msg.sha256,
-            size: msg.size,
-          }).catch(console.error);
+
+          if (pendingPublishToNostr) {
+            setState('publishing');
+            browser.runtime.sendMessage({
+              type: MessageType.PUBLISH_NOTE,
+              target: 'offscreen',
+              blossomUrl: msg.url,
+              sha256: msg.sha256,
+              size: msg.size,
+            }).catch(console.error);
+          } else {
+            // Skip Nostr publish — go straight to complete
+            setState('complete');
+          }
           return false;
         }
 
@@ -273,6 +299,55 @@ export default defineBackground(() => {
             .then((result) => sendResponse(result))
             .catch((err) => sendResponse({ ok: false, error: err.message }));
           return true; // async sendResponse
+        }
+
+        case MessageType.GET_CONFIRM_DATA: {
+          if (currentState === 'preview') setState('confirming');
+          getSettings()
+            .then((settings) => {
+              const nip07Available = cachedNip07 !== null && 'pubkey' in cachedNip07;
+              sendResponse({
+                npub: nip07Available ? (cachedNip07 as { pubkey: string }).pubkey : null,
+                signerAvailable: nip07Available,
+                bridgeError: cachedNip07 !== null && 'error' in cachedNip07
+                  ? (cachedNip07 as { error: string }).error
+                  : cachedNip07 === null ? 'NIP-07 probe still in progress' : null,
+                server: settings.blossomServers[0] || 'https://blossom.band',
+                relays: settings.nostrRelays,
+                publishToNostr: settings.publishToNostr,
+                fileSize: lastRecordingMeta?.size ?? 0,
+                duration: lastRecordingMeta?.duration ?? 0,
+              });
+            })
+            .catch((err) => {
+              console.error('[background] GET_CONFIRM_DATA error:', err);
+              sendResponse(null);
+            });
+          return true; // async sendResponse
+        }
+
+        case MessageType.CONFIRM_UPLOAD: {
+          const msg = message as any;
+          pendingPublishToNostr = msg.publishToNostr !== false;
+          setState('uploading');
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                type: MessageType.START_UPLOAD,
+                target: 'offscreen',
+                serverOverride: msg.serverOverride,
+                publishToNostr: msg.publishToNostr,
+              }),
+            )
+            .catch(console.error);
+          sendResponse({ ok: true });
+          return false;
+        }
+
+        case MessageType.BACK_TO_PREVIEW: {
+          setState('preview');
+          sendResponse({ ok: true });
+          return false;
         }
 
         default:

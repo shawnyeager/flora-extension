@@ -45,6 +45,11 @@ export const MessageType = {
 
   // Result retrieval
   GET_RESULT: 'get_result',
+
+  // Confirmation flow
+  GET_CONFIRM_DATA: 'get_confirm_data',
+  CONFIRM_UPLOAD: 'confirm_upload',
+  BACK_TO_PREVIEW: 'back_to_preview',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -131,6 +136,8 @@ export interface UploadProgressMessage extends BaseMessage {
 export interface StartUploadMessage extends BaseMessage {
   type: typeof MessageType.START_UPLOAD;
   target: 'offscreen';
+  serverOverride?: string;
+  publishToNostr?: boolean;
 }
 
 export interface UploadCompleteMessage extends BaseMessage {
@@ -177,6 +184,20 @@ export interface GetResultMessage extends BaseMessage {
   type: typeof MessageType.GET_RESULT;
 }
 
+export interface GetConfirmDataMessage extends BaseMessage {
+  type: typeof MessageType.GET_CONFIRM_DATA;
+}
+
+export interface ConfirmUploadMessage extends BaseMessage {
+  type: typeof MessageType.CONFIRM_UPLOAD;
+  serverOverride?: string;
+  publishToNostr: boolean;
+}
+
+export interface BackToPreviewMessage extends BaseMessage {
+  type: typeof MessageType.BACK_TO_PREVIEW;
+}
+
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
@@ -200,4 +221,7 @@ export type Message =
   | PublishErrorMessage
   | Nip07SignMessage
   | Nip07GetPubkeyMessage
-  | GetResultMessage;
+  | GetResultMessage
+  | GetConfirmDataMessage
+  | ConfirmUploadMessage
+  | BackToPreviewMessage;

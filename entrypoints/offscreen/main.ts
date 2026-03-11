@@ -296,7 +296,7 @@ async function getPublicKey(): Promise<string> {
 
 // --- Blossom Upload ---
 
-async function uploadRecording() {
+async function uploadRecording(serverOverride?: string) {
   try {
     const db = await openDB();
     const tx = db.transaction('recordings', 'readonly');
@@ -319,7 +319,7 @@ async function uploadRecording() {
 
     const blob = new Blob([recording.data], { type: 'video/mp4' });
     const settings = await getSettings();
-    const primaryServer = settings.blossomServers[0];
+    const primaryServer = serverOverride || settings.blossomServers[0];
     if (!primaryServer) throw new Error('No Blossom server configured');
 
     console.log(`[offscreen] uploading ${blob.size} bytes to ${primaryServer}`);
@@ -358,16 +358,6 @@ async function uploadRecording() {
 async function publishNote(blossomUrl: string, sha256: string, size: number) {
   try {
     const settings = await getSettings();
-    if (!settings.publishToNostr) {
-      console.log('[offscreen] Nostr publishing disabled');
-      browser.runtime.sendMessage({
-        type: MessageType.PUBLISH_COMPLETE,
-        noteId: '',
-        blossomUrl,
-      });
-      return;
-    }
-
     const signer = createSigner();
 
     const draft = {
@@ -446,10 +436,12 @@ browser.runtime.onMessage.addListener(
         getLatestRecording().then(sendResponse);
         return true;
 
-      case MessageType.START_UPLOAD:
-        uploadRecording();
+      case MessageType.START_UPLOAD: {
+        const msg = message as any;
+        uploadRecording(msg.serverOverride);
         sendResponse({ ok: true });
         return false;
+      }
 
       case MessageType.PUBLISH_NOTE: {
         const msg = message as any;

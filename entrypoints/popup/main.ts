@@ -3,10 +3,16 @@ import type { ExtensionState } from '@/utils/state';
 
 const app = document.getElementById('app')!;
 
+// --- Shared elements ---
 const logo = document.createElement('div');
 logo.className = 'logo';
 logo.textContent = 'Bloom';
 
+const status = document.createElement('div');
+status.className = 'status';
+status.textContent = 'Ready';
+
+// --- Idle / Recording ---
 const btnRecord = document.createElement('button');
 btnRecord.className = 'btn-record';
 btnRecord.textContent = 'Start Recording';
@@ -16,7 +22,7 @@ btnStop.className = 'btn-stop';
 btnStop.textContent = 'Stop Recording';
 btnStop.style.display = 'none';
 
-// Preview state elements
+// --- Preview ---
 const previewVideo = document.createElement('video');
 previewVideo.className = 'preview-video';
 previewVideo.controls = true;
@@ -32,6 +38,26 @@ btnDownload.className = 'btn-stop';
 btnDownload.textContent = 'Download MP4';
 btnDownload.style.display = 'none';
 
+// --- Confirmation screen ---
+const confirmSection = document.createElement('div');
+confirmSection.className = 'confirm-section';
+confirmSection.style.display = 'none';
+confirmSection.innerHTML = `
+  <div class="confirm-meta"></div>
+  <label class="confirm-label">Upload to:</label>
+  <input type="text" class="confirm-input" id="confirm-server" placeholder="https://blossom.band" />
+  <label class="confirm-check-label">
+    <input type="checkbox" id="confirm-publish" checked />
+    Publish note to Nostr
+  </label>
+  <div class="confirm-relays"></div>
+  <div class="confirm-identity"></div>
+  <div class="confirm-warning"></div>
+  <button class="btn-record" id="btn-confirm">Confirm</button>
+  <button class="btn-reset" id="btn-back">Back</button>
+`;
+
+// --- Complete / Error ---
 const btnCopy = document.createElement('button');
 btnCopy.className = 'btn-copy';
 btnCopy.textContent = 'Copy Link';
@@ -52,11 +78,31 @@ resultLink.className = 'result-link';
 resultLink.target = '_blank';
 resultLink.style.display = 'none';
 
-const status = document.createElement('div');
-status.className = 'status';
-status.textContent = 'Ready';
+// --- Settings link ---
+const settingsLink = document.createElement('a');
+settingsLink.className = 'settings-link';
+settingsLink.textContent = 'Settings';
+settingsLink.href = '#';
+settingsLink.style.display = 'none';
 
-app.append(logo, btnRecord, btnStop, previewVideo, btnUpload, btnDownload, btnCopy, btnRetry, btnReset, resultLink, status);
+app.append(
+  logo, btnRecord, btnStop, previewVideo, btnUpload, btnDownload,
+  confirmSection, btnCopy, btnRetry, btnReset, resultLink, status, settingsLink,
+);
+
+// --- Confirmation screen element refs ---
+const confirmMeta = confirmSection.querySelector('.confirm-meta') as HTMLDivElement;
+const confirmServer = confirmSection.querySelector('#confirm-server') as HTMLInputElement;
+const confirmPublish = confirmSection.querySelector('#confirm-publish') as HTMLInputElement;
+const confirmRelays = confirmSection.querySelector('.confirm-relays') as HTMLDivElement;
+const confirmIdentity = confirmSection.querySelector('.confirm-identity') as HTMLDivElement;
+const confirmWarning = confirmSection.querySelector('.confirm-warning') as HTMLDivElement;
+const btnConfirm = confirmSection.querySelector('#btn-confirm') as HTMLButtonElement;
+const btnBack = confirmSection.querySelector('#btn-back') as HTMLButtonElement;
+
+let confirmLocked = false;
+
+// --- Event handlers ---
 
 btnRecord.addEventListener('click', async () => {
   const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
@@ -74,7 +120,9 @@ btnStop.addEventListener('click', async () => {
 });
 
 btnUpload.addEventListener('click', async () => {
-  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD });
+  // Go to confirming state — NOT directly to uploading
+  await browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
+  // State transition is handled by background; UI updates via STATE_CHANGED
 });
 
 btnDownload.addEventListener('click', async () => {
@@ -99,6 +147,23 @@ btnDownload.addEventListener('click', async () => {
   }
 });
 
+btnConfirm.addEventListener('click', async () => {
+  if (confirmLocked) return;
+  confirmLocked = true;
+  btnConfirm.disabled = true;
+  btnConfirm.textContent = 'Uploading...';
+
+  await browser.runtime.sendMessage({
+    type: MessageType.CONFIRM_UPLOAD,
+    serverOverride: confirmServer.value.trim() || undefined,
+    publishToNostr: confirmPublish.checked,
+  });
+});
+
+btnBack.addEventListener('click', async () => {
+  await browser.runtime.sendMessage({ type: MessageType.BACK_TO_PREVIEW });
+});
+
 btnCopy.addEventListener('click', async () => {
   const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });
   const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
@@ -110,7 +175,7 @@ btnCopy.addEventListener('click', async () => {
 });
 
 btnRetry.addEventListener('click', async () => {
-  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD });
+  await browser.runtime.sendMessage({ type: MessageType.CONFIRM_UPLOAD, publishToNostr: true });
 });
 
 btnReset.addEventListener('click', async () => {
@@ -119,7 +184,13 @@ btnReset.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
 });
 
-// Listen for state updates and upload progress
+settingsLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
+});
+
+// --- State listener ---
+
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === MessageType.STATE_CHANGED) {
     updateUI(message.state);
@@ -135,6 +206,25 @@ browser.runtime.sendMessage({ type: MessageType.GET_STATE }).then((state) => {
   if (state) updateUI(state as ExtensionState);
 });
 
+// --- Helpers ---
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function truncateNpub(hex: string): string {
+  if (hex.length <= 16) return hex;
+  return `${hex.slice(0, 8)}...${hex.slice(-8)}`;
+}
+
 const STATE_LABELS: Record<ExtensionState, string> = {
   idle: 'Ready',
   initializing: 'Starting...',
@@ -143,6 +233,7 @@ const STATE_LABELS: Record<ExtensionState, string> = {
   recording: 'Recording',
   finalizing: 'Saving...',
   preview: 'Review your recording',
+  confirming: 'Review before sharing',
   uploading: 'Uploading...',
   publishing: 'Publishing to Nostr...',
   complete: 'Done!',
@@ -152,18 +243,28 @@ const STATE_LABELS: Record<ExtensionState, string> = {
 async function updateUI(state: ExtensionState) {
   status.textContent = STATE_LABELS[state] || state;
 
+  // Reset confirm lock when leaving confirming state
+  if (state !== 'confirming') {
+    confirmLocked = false;
+    btnConfirm.disabled = false;
+    btnConfirm.textContent = 'Confirm';
+  }
+
+  // Visibility
   btnRecord.style.display = state === 'idle' ? 'block' : 'none';
   btnStop.style.display = state === 'recording' ? 'block' : 'none';
   btnUpload.style.display = state === 'preview' ? 'block' : 'none';
-  btnDownload.style.display = ['preview', 'complete'].includes(state) ? 'block' : 'none';
+  btnDownload.style.display = ['preview', 'confirming', 'complete'].includes(state) ? 'block' : 'none';
+  confirmSection.style.display = state === 'confirming' ? 'block' : 'none';
   btnCopy.style.display = state === 'complete' ? 'block' : 'none';
   btnRetry.style.display = state === 'error' ? 'block' : 'none';
-  btnReset.style.display = ['preview', 'complete', 'error'].includes(state) ? 'block' : 'none';
+  btnReset.style.display = ['preview', 'confirming', 'complete', 'error'].includes(state) ? 'block' : 'none';
   resultLink.style.display = 'none';
+  settingsLink.style.display = ['idle', 'preview', 'confirming', 'complete'].includes(state) ? 'block' : 'none';
 
-  if (state === 'preview') {
+  // Preview video
+  if (state === 'preview' || state === 'confirming') {
     btnReset.textContent = 'Discard';
-    // Load recording for playback
     if (!previewVideo.src) {
       try {
         const result = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING });
@@ -184,6 +285,12 @@ async function updateUI(state: ExtensionState) {
     btnReset.textContent = 'New Recording';
   }
 
+  // Populate confirmation screen
+  if (state === 'confirming') {
+    await populateConfirmScreen();
+  }
+
+  // Complete state
   if (state === 'complete') {
     const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });
     const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
@@ -192,5 +299,53 @@ async function updateUI(state: ExtensionState) {
       resultLink.textContent = url;
       resultLink.style.display = 'block';
     }
+  }
+}
+
+async function populateConfirmScreen() {
+  const data = await browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
+  if (!data) return;
+
+  // File size + duration
+  confirmMeta.textContent = `${formatBytes(data.fileSize)} \u00b7 ${formatDuration(data.duration)}`;
+
+  // Server
+  confirmServer.value = data.server;
+
+  // Publish toggle
+  confirmPublish.checked = data.publishToNostr;
+
+  // Relays
+  if (data.relays?.length) {
+    confirmRelays.textContent = data.relays.join(', ');
+    confirmRelays.style.display = 'block';
+  } else {
+    confirmRelays.style.display = 'none';
+  }
+
+  // Toggle relay visibility based on publish checkbox
+  const updateRelayVisibility = () => {
+    confirmRelays.style.display = confirmPublish.checked && data.relays?.length ? 'block' : 'none';
+  };
+  confirmPublish.onchange = updateRelayVisibility;
+
+  // Identity + signer warnings
+  confirmWarning.textContent = '';
+  confirmWarning.style.display = 'none';
+
+  if (data.signerAvailable && data.npub) {
+    confirmIdentity.textContent = `Signing as: ${truncateNpub(data.npub)}`;
+    confirmIdentity.style.display = 'block';
+    btnConfirm.disabled = false;
+  } else {
+    confirmIdentity.style.display = 'none';
+    const errorMsg = data.bridgeError || 'No Nostr signer detected';
+    if (errorMsg.includes('No content script')) {
+      confirmWarning.textContent = 'Open any web page to enable Nostr signing';
+    } else {
+      confirmWarning.textContent = 'No Nostr signer detected. Install nos2x or Alby to upload and share.';
+    }
+    confirmWarning.style.display = 'block';
+    btnConfirm.disabled = true;
   }
 }
