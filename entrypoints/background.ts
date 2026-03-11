@@ -12,30 +12,31 @@ let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 
 async function relayToContentScript(message: Message): Promise<any> {
-  // Try active tab first, fall back to any tab
+  // Build ordered list of tabs to try: active tab first, then others
   const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-  const tabId = activeTab?.id;
-
-  if (tabId) {
-    try {
-      return await browser.tabs.sendMessage(tabId, message);
-    } catch {
-      // Active tab doesn't have content script, try others
-    }
+  const allTabs = await browser.tabs.query({});
+  const tabIds: number[] = [];
+  if (activeTab?.id) tabIds.push(activeTab.id);
+  for (const tab of allTabs) {
+    if (tab.id && !tabIds.includes(tab.id)) tabIds.push(tab.id);
   }
 
-  // Try all tabs
-  const tabs = await browser.tabs.query({});
-  for (const tab of tabs) {
-    if (!tab.id || tab.id === tabId) continue;
+  let lastError: string | undefined;
+  for (const id of tabIds) {
     try {
-      return await browser.tabs.sendMessage(tab.id, message);
+      const result = await browser.tabs.sendMessage(id, message);
+      // If the content script returned an error response, try other tabs
+      if (result?.ok === false) {
+        lastError = result.error || 'Unknown error from content script';
+        continue;
+      }
+      return result;
     } catch {
       continue;
     }
   }
 
-  throw new Error('No content script available for NIP-07 signing');
+  throw new Error(lastError || 'No content script available for NIP-07 signing');
 }
 
 let nip07ProbePromise: Promise<void> | null = null;
@@ -44,10 +45,13 @@ function probeNip07() {
   cachedNip07 = null;
   nip07ProbePromise = relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
     .then((result) => {
-      if (result?.ok !== false && result?.data) {
+      console.log('[background] NIP-07 probe result:', JSON.stringify(result));
+      if (result?.ok && result?.data) {
         cachedNip07 = { pubkey: result.data };
+      } else if (result?.error) {
+        cachedNip07 = { error: result.error };
       } else {
-        cachedNip07 = { error: result?.error || 'Unknown NIP-07 error' };
+        cachedNip07 = { error: `No pubkey returned (response: ${JSON.stringify(result)})` };
       }
     })
     .catch((err) => {

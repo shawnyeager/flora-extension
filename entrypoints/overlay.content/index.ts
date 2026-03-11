@@ -61,6 +61,14 @@ export default defineContentScript({
       });
     }
 
+    // Clean up webcam if content script context is invalidated (extension reload, etc.)
+    ctx.onInvalidated(() => {
+      console.log('[overlay] context invalidated, cleaning up webcam');
+      webcamAborted = true;
+      webcamStream?.getTracks().forEach((t) => t.stop());
+      webcamStream = null;
+    });
+
     // Inject the nostr-bridge script into page main world
     try {
       await injectScript('/nostr-bridge.js', { keepInDom: true });
@@ -250,7 +258,13 @@ export default defineContentScript({
 
       if (message.type === MessageType.NIP07_GET_PUBKEY) {
         bridgeRequest('bloom:getPublicKey')
-          .then((pubkey) => sendResponse({ ok: true, data: pubkey }))
+          .then((pubkey) => {
+            if (pubkey) {
+              sendResponse({ ok: true, data: pubkey });
+            } else {
+              sendResponse({ ok: false, error: 'Signer returned empty pubkey' });
+            }
+          })
           .catch((err) => sendResponse({ ok: false, error: err.message }));
         return true; // async sendResponse
       }
