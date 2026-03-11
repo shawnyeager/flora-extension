@@ -127,21 +127,7 @@ async function showPreview() {
     relaySection.style.display = 'none';
   }
 
-  signerWarning.style.display = 'none';
-  if (data.signerAvailable && data.npub) {
-    destIdentity.textContent = truncateKey(data.npub);
-    btnUpload.disabled = false;
-  } else {
-    destIdentity.textContent = '';
-    const err = data.bridgeError || 'No Nostr signer detected';
-    if (err.includes('No content script')) {
-      signerWarning.textContent = 'Open any web page to enable Nostr signing.';
-    } else {
-      signerWarning.textContent = 'No Nostr signer detected. Install nos2x or Alby to upload and share.';
-    }
-    signerWarning.style.display = 'block';
-    btnUpload.disabled = true;
-  }
+  renderSignerStatus(data, destIdentity, signerWarning, btnUpload);
 }
 
 async function showConfirm() {
@@ -165,22 +151,53 @@ async function showConfirm() {
   updateRelays();
   confirmPublish.onchange = updateRelays;
 
-  confirmWarning.style.display = 'none';
-  if (data.signerAvailable && data.npub) {
-    confirmIdentity.textContent = truncateKey(data.npub);
-    btnConfirm.disabled = false;
-  } else {
-    confirmIdentity.textContent = 'Not available';
-    const err = data.bridgeError || 'No Nostr signer detected';
-    confirmWarning.textContent = err.includes('No content script')
-      ? 'Open any web page to enable Nostr signing.'
-      : 'No Nostr signer detected. Install nos2x or Alby to upload.';
-    confirmWarning.style.display = 'block';
-    btnConfirm.disabled = true;
-  }
+  renderSignerStatus(data, confirmIdentity, confirmWarning, btnConfirm);
 
   confirmLocked = false;
   btnConfirm.textContent = 'Confirm Upload';
+}
+
+function renderSignerStatus(
+  data: ConfirmData,
+  identityEl: HTMLElement,
+  warningEl: HTMLElement,
+  actionBtn: HTMLButtonElement,
+) {
+  warningEl.style.display = 'none';
+  if (data.signerAvailable && data.npub) {
+    identityEl.textContent = truncateKey(data.npub);
+    actionBtn.disabled = false;
+  } else {
+    identityEl.textContent = '';
+    const errDetail = data.bridgeError || 'Unknown error';
+
+    warningEl.textContent = '';
+    while (warningEl.firstChild) warningEl.firstChild.remove();
+
+    const msg = document.createElement('div');
+    msg.textContent = `Signer error: ${errDetail}`;
+    warningEl.append(msg);
+
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'btn-ghost';
+    retryBtn.textContent = 'Retry signer detection';
+    retryBtn.style.marginTop = '8px';
+    retryBtn.addEventListener('click', async () => {
+      retryBtn.textContent = 'Checking\u2026';
+      retryBtn.disabled = true;
+      const freshData = await getConfirmData();
+      if (freshData) {
+        renderSignerStatus(freshData, identityEl, warningEl, actionBtn);
+      } else {
+        retryBtn.textContent = 'Retry signer detection';
+        retryBtn.disabled = false;
+      }
+    });
+    warningEl.append(retryBtn);
+
+    warningEl.style.display = 'block';
+    actionBtn.disabled = true;
+  }
 }
 
 // --- Event handlers ---

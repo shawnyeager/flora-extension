@@ -319,12 +319,9 @@ export default defineBackground(() => {
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          // Wait for in-flight probe, or do a fresh one if no cached result
-          const probeReady = nip07ProbePromise
-            ? nip07ProbePromise
-            : cachedNip07 === null
-              ? (probeNip07(), nip07ProbePromise ?? Promise.resolve())
-              : Promise.resolve();
+          // Always do a fresh probe — stale cache causes false negatives
+          if (!nip07ProbePromise) probeNip07();
+          const probeReady = nip07ProbePromise ?? Promise.resolve();
 
           Promise.all([probeReady, getSettings()])
             .then(([, settings]) => {
