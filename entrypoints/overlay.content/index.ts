@@ -35,7 +35,7 @@ export default defineContentScript({
         return;
       }
 
-      if (data.id && pendingRequests.has(data.id)) {
+      if (data.channel === bridgeChannel && data.id && pendingRequests.has(data.id)) {
         const pending = pendingRequests.get(data.id)!;
         pendingRequests.delete(data.id);
         if (data.type === 'bloom:error') {

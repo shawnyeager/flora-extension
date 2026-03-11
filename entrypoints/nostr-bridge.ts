@@ -23,6 +23,7 @@ export default defineUnlistedScript(() => {
       }
       try {
         const pubkey = await nostr.getPublicKey();
+        console.log('[nostr-bridge] getPublicKey returned:', typeof pubkey, pubkey ? String(pubkey).slice(0, 16) : pubkey);
         window.postMessage({ channel: CHANNEL, type: 'bloom:publicKey', id: event.data.id, data: pubkey }, '*');
       } catch (err) {
         window.postMessage({ channel: CHANNEL, type: 'bloom:error', id: event.data.id, error: String(err) }, '*');
