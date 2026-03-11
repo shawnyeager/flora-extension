@@ -7,16 +7,17 @@ const OFFSCREEN_PATH = '/offscreen.html';
 let currentState: ExtensionState = 'idle';
 let uploadResult: { url: string; sha256: string; size: number } | null = null;
 let publishResult: { noteId: string; blossomUrl: string } | null = null;
-let cachedNip07: { pubkey: string } | { error: string } | null = null;
 let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
+let recordingTabId: number | null = null;
 
 async function relayToContentScript(message: Message): Promise<any> {
-  // Build ordered list of tabs to try: active tab first, then others
+  // Build ordered list: recording tab first (user is looking at it), then active, then others
   const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
   const allTabs = await browser.tabs.query({});
   const tabIds: number[] = [];
-  if (activeTab?.id) tabIds.push(activeTab.id);
+  if (recordingTabId) tabIds.push(recordingTabId);
+  if (activeTab?.id && !tabIds.includes(activeTab.id)) tabIds.push(activeTab.id);
   for (const tab of allTabs) {
     if (tab.id && !tabIds.includes(tab.id)) tabIds.push(tab.id);
   }
@@ -39,48 +40,13 @@ async function relayToContentScript(message: Message): Promise<any> {
   throw new Error(lastError || 'No content script available for NIP-07 signing');
 }
 
-let nip07ProbePromise: Promise<void> | null = null;
-
-function probeNip07() {
-  cachedNip07 = null;
-  nip07ProbePromise = relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
-    .then((result) => {
-      console.log('[background] NIP-07 probe result:', JSON.stringify(result));
-      if (result?.ok && result?.data) {
-        cachedNip07 = { pubkey: result.data };
-      } else if (result?.error) {
-        cachedNip07 = { error: result.error };
-      } else {
-        cachedNip07 = { error: `No pubkey returned (response: ${JSON.stringify(result)})` };
-      }
-    })
-    .catch((err) => {
-      cachedNip07 = { error: err.message };
-    })
-    .finally(() => {
-      nip07ProbePromise = null;
-    });
-}
-
-function openReviewTab() {
-  const reviewUrl = browser.runtime.getURL('/review.html');
-  // Reuse existing review tab if open
-  browser.tabs.query({ url: reviewUrl }).then((tabs) => {
-    if (tabs.length > 0 && tabs[0].id) {
-      browser.tabs.update(tabs[0].id, { active: true });
-    } else {
-      browser.tabs.create({ url: reviewUrl });
-    }
-  });
-}
-
 function setState(state: ExtensionState) {
   currentState = state;
   browser.storage.local.set({ state });
 
-  // Open review tab when entering preview
-  if (state === 'preview') {
-    openReviewTab();
+  // Focus the recording tab when entering preview (review overlay shows there)
+  if (state === 'preview' && recordingTabId) {
+    browser.tabs.update(recordingTabId, { active: true }).catch(() => {});
   }
 
   // Send to extension pages (popup, offscreen, review)
@@ -159,6 +125,12 @@ export default defineBackground(() => {
           return false;
 
         case MessageType.START_RECORDING: {
+          // Track which tab the user is on — review overlay and NIP-07 happen there
+          browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+            recordingTabId = tab?.id ?? null;
+            browser.storage.local.set({ recordingTabId });
+          });
+
           setState('initializing');
 
           ensureOffscreenDocument()
@@ -240,8 +212,6 @@ export default defineBackground(() => {
           console.log(`[background] recording complete: ${msg.size} bytes, ${msg.duration}s`);
           lastRecordingMeta = { size: msg.size, duration: msg.duration };
           setState('preview');
-          // Proactively probe NIP-07 so confirmation screen has data ready
-          probeNip07();
           return false;
         }
 
@@ -323,19 +293,10 @@ export default defineBackground(() => {
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          // Always do a fresh probe — stale cache causes false negatives
-          if (!nip07ProbePromise) probeNip07();
-          const probeReady = nip07ProbePromise ?? Promise.resolve();
-
-          Promise.all([probeReady, getSettings()])
-            .then(([, settings]) => {
-              const nip07Available = cachedNip07 !== null && 'pubkey' in cachedNip07;
+          // Return settings + recording metadata (NIP-07 probing done by content script directly)
+          getSettings()
+            .then((settings) => {
               sendResponse({
-                npub: nip07Available ? (cachedNip07 as { pubkey: string }).pubkey : null,
-                signerAvailable: nip07Available,
-                bridgeError: cachedNip07 !== null && 'error' in cachedNip07
-                  ? (cachedNip07 as { error: string }).error
-                  : null,
                 server: settings.blossomServers[0] || 'https://blossom.band',
                 relays: settings.nostrRelays,
                 publishToNostr: settings.publishToNostr,

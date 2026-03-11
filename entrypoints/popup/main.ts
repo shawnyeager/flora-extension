@@ -47,7 +47,16 @@ btnStop.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: MessageType.STOP_RECORDING });
 });
 
-btnOpen.addEventListener('click', () => {
+btnOpen.addEventListener('click', async () => {
+  // Focus the recording tab where the review overlay is showing
+  const { recordingTabId } = await browser.storage.local.get('recordingTabId');
+  if (recordingTabId) {
+    try {
+      await browser.tabs.update(recordingTabId as number, { active: true });
+      return;
+    } catch { /* tab may have been closed */ }
+  }
+  // Fallback: open review page
   browser.tabs.create({ url: browser.runtime.getURL('/review.html') });
 });
 
