@@ -38,9 +38,11 @@ async function relayToContentScript(message: Message): Promise<any> {
   throw new Error('No content script available for NIP-07 signing');
 }
 
+let nip07ProbePromise: Promise<void> | null = null;
+
 function probeNip07() {
   cachedNip07 = null;
-  relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
+  nip07ProbePromise = relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
     .then((result) => {
       if (result?.ok !== false && result?.data) {
         cachedNip07 = { pubkey: result.data };
@@ -50,6 +52,9 @@ function probeNip07() {
     })
     .catch((err) => {
       cachedNip07 = { error: err.message };
+    })
+    .finally(() => {
+      nip07ProbePromise = null;
     });
 }
 
@@ -314,15 +319,22 @@ export default defineBackground(() => {
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          getSettings()
-            .then((settings) => {
+          // Wait for in-flight probe, or do a fresh one if no cached result
+          const probeReady = nip07ProbePromise
+            ? nip07ProbePromise
+            : cachedNip07 === null
+              ? (probeNip07(), nip07ProbePromise ?? Promise.resolve())
+              : Promise.resolve();
+
+          Promise.all([probeReady, getSettings()])
+            .then(([, settings]) => {
               const nip07Available = cachedNip07 !== null && 'pubkey' in cachedNip07;
               sendResponse({
                 npub: nip07Available ? (cachedNip07 as { pubkey: string }).pubkey : null,
                 signerAvailable: nip07Available,
                 bridgeError: cachedNip07 !== null && 'error' in cachedNip07
                   ? (cachedNip07 as { error: string }).error
-                  : cachedNip07 === null ? 'NIP-07 probe still in progress' : null,
+                  : null,
                 server: settings.blossomServers[0] || 'https://blossom.band',
                 relays: settings.nostrRelays,
                 publishToNostr: settings.publishToNostr,
