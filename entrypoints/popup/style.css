@@ -76,6 +76,53 @@ body {
   color: #ccc;
 }
 
+.btn-copy {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #38a169;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-copy:hover {
+  background: #2f855a;
+}
+
+.btn-retry {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #d69e2e;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-retry:hover {
+  background: #b7791f;
+}
+
+.result-link {
+  width: 100%;
+  font-size: 12px;
+  color: #63b3ed;
+  word-break: break-all;
+  text-align: center;
+  text-decoration: none;
+}
+
+.result-link:hover {
+  text-decoration: underline;
+}
+
 .status {
   font-size: 13px;
   color: #888;

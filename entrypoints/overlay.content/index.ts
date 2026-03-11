@@ -14,6 +14,61 @@ export default defineContentScript({
     let webcamAborted = false;
     let webcamAcquiring = false;
 
+    // --- NIP-07 bridge injection and proxy ---
+    let bridgeChannel: string | null = null;
+    const pendingRequests = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+
+    // Listen for bridge messages (ready signal + responses)
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'bloom:bridge:ready' && data.channel) {
+        bridgeChannel = data.channel;
+        console.log('[overlay] nostr bridge ready, channel:', bridgeChannel);
+        return;
+      }
+
+      // Match responses to pending requests
+      if (data.id && pendingRequests.has(data.id)) {
+        const pending = pendingRequests.get(data.id)!;
+        pendingRequests.delete(data.id);
+        if (data.type === 'bloom:error') {
+          pending.reject(new Error(data.error));
+        } else {
+          pending.resolve(data.data);
+        }
+      }
+    });
+
+    function bridgeRequest(type: string, payload?: Record<string, any>): Promise<any> {
+      return new Promise((resolve, reject) => {
+        if (!bridgeChannel) {
+          reject(new Error('NIP-07 bridge not ready'));
+          return;
+        }
+        const id = crypto.randomUUID();
+        pendingRequests.set(id, { resolve, reject });
+        window.postMessage({ channel: bridgeChannel, type, id, ...payload }, '*');
+        // Timeout after 60s (user may need to approve in signer)
+        setTimeout(() => {
+          if (pendingRequests.has(id)) {
+            pendingRequests.delete(id);
+            reject(new Error('NIP-07 signing request timed out'));
+          }
+        }, 60_000);
+      });
+    }
+
+    // Inject the nostr-bridge script into page main world
+    try {
+      await injectScript('/nostr-bridge.js', { keepInDom: true });
+      console.log('[overlay] nostr-bridge injected');
+    } catch (err) {
+      console.warn('[overlay] failed to inject nostr-bridge:', err);
+    }
+
     const ui = await createShadowRootUi(ctx, {
       name: 'bloom-overlay',
       position: 'overlay',
@@ -186,11 +241,28 @@ export default defineContentScript({
       }
     }
 
-    // Listen for state changes via direct message from background
-    browser.runtime.onMessage.addListener((message: any) => {
+    // Listen for messages from background
+    browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
       if (message.type === 'state_changed' && message.state) {
         updateUI(message.state as ExtensionState);
+        return false;
       }
+
+      if (message.type === MessageType.NIP07_GET_PUBKEY) {
+        bridgeRequest('bloom:getPublicKey')
+          .then((pubkey) => sendResponse({ ok: true, data: pubkey }))
+          .catch((err) => sendResponse({ ok: false, error: err.message }));
+        return true; // async sendResponse
+      }
+
+      if (message.type === MessageType.NIP07_SIGN) {
+        bridgeRequest('bloom:signEvent', { event: message.event })
+          .then((signed) => sendResponse({ ok: true, data: signed }))
+          .catch((err) => sendResponse({ ok: false, error: err.message }));
+        return true; // async sendResponse
+      }
+
+      return false;
     });
 
     // Also listen via storage.local as backup

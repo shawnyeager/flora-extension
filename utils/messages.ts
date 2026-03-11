@@ -28,8 +28,23 @@ export const MessageType = {
   TOGGLE_WEBCAM: 'toggle_webcam',
   TOGGLE_MIC: 'toggle_mic',
 
-  // Offscreen -> Background (upload progress)
+  // Upload flow
+  START_UPLOAD: 'start_upload',
   UPLOAD_PROGRESS: 'upload_progress',
+  UPLOAD_COMPLETE: 'upload_complete',
+  UPLOAD_ERROR: 'upload_error',
+
+  // Nostr publishing
+  PUBLISH_NOTE: 'publish_note',
+  PUBLISH_COMPLETE: 'publish_complete',
+  PUBLISH_ERROR: 'publish_error',
+
+  // NIP-07 signing proxy
+  NIP07_SIGN: 'nip07_sign',
+  NIP07_GET_PUBKEY: 'nip07_get_pubkey',
+
+  // Result retrieval
+  GET_RESULT: 'get_result',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -113,6 +128,55 @@ export interface UploadProgressMessage extends BaseMessage {
   serverName: string;
 }
 
+export interface StartUploadMessage extends BaseMessage {
+  type: typeof MessageType.START_UPLOAD;
+  target: 'offscreen';
+}
+
+export interface UploadCompleteMessage extends BaseMessage {
+  type: typeof MessageType.UPLOAD_COMPLETE;
+  url: string;
+  sha256: string;
+  size: number;
+}
+
+export interface UploadErrorMessage extends BaseMessage {
+  type: typeof MessageType.UPLOAD_ERROR;
+  error: string;
+}
+
+export interface PublishNoteMessage extends BaseMessage {
+  type: typeof MessageType.PUBLISH_NOTE;
+  target: 'offscreen';
+  blossomUrl: string;
+  sha256: string;
+  size: number;
+}
+
+export interface PublishCompleteMessage extends BaseMessage {
+  type: typeof MessageType.PUBLISH_COMPLETE;
+  noteId: string;
+  blossomUrl: string;
+}
+
+export interface PublishErrorMessage extends BaseMessage {
+  type: typeof MessageType.PUBLISH_ERROR;
+  error: string;
+}
+
+export interface Nip07SignMessage extends BaseMessage {
+  type: typeof MessageType.NIP07_SIGN;
+  event: { kind: number; content: string; tags: string[][]; created_at: number };
+}
+
+export interface Nip07GetPubkeyMessage extends BaseMessage {
+  type: typeof MessageType.NIP07_GET_PUBKEY;
+}
+
+export interface GetResultMessage extends BaseMessage {
+  type: typeof MessageType.GET_RESULT;
+}
+
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
@@ -127,4 +191,13 @@ export type Message =
   | GetRecordingMessage
   | ToggleWebcamMessage
   | ToggleMicMessage
-  | UploadProgressMessage;
+  | UploadProgressMessage
+  | StartUploadMessage
+  | UploadCompleteMessage
+  | UploadErrorMessage
+  | PublishNoteMessage
+  | PublishCompleteMessage
+  | PublishErrorMessage
+  | Nip07SignMessage
+  | Nip07GetPubkeyMessage
+  | GetResultMessage;

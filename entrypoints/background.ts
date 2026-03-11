@@ -4,6 +4,35 @@ import { type ExtensionState } from '@/utils/state';
 const OFFSCREEN_PATH = '/offscreen.html';
 
 let currentState: ExtensionState = 'idle';
+let uploadResult: { url: string; sha256: string; size: number } | null = null;
+let publishResult: { noteId: string; blossomUrl: string } | null = null;
+
+async function relayToContentScript(message: Message): Promise<any> {
+  // Try active tab first, fall back to any tab
+  const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+  const tabId = activeTab?.id;
+
+  if (tabId) {
+    try {
+      return await browser.tabs.sendMessage(tabId, message);
+    } catch {
+      // Active tab doesn't have content script, try others
+    }
+  }
+
+  // Try all tabs
+  const tabs = await browser.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.id || tab.id === tabId) continue;
+    try {
+      return await browser.tabs.sendMessage(tab.id, message);
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error('No content script available for NIP-07 signing');
+}
 
 function setState(state: ExtensionState) {
   currentState = state;
@@ -74,8 +103,14 @@ export default defineBackground(() => {
 
         case MessageType.RESET_STATE:
           setState('idle');
+          uploadResult = null;
+          publishResult = null;
           closeOffscreenDocument().catch(console.error);
           sendResponse({ ok: true });
+          return false;
+
+        case MessageType.GET_RESULT:
+          sendResponse({ uploadResult, publishResult });
           return false;
 
         case MessageType.START_RECORDING: {
@@ -158,8 +193,91 @@ export default defineBackground(() => {
         case MessageType.RECORDING_COMPLETE: {
           const msg = message as any;
           console.log(`[background] recording complete: ${msg.size} bytes, ${msg.duration}s`);
+          // Auto-trigger upload
+          setState('uploading');
+          browser.runtime.sendMessage({
+            type: MessageType.START_UPLOAD,
+            target: 'offscreen',
+          }).catch(console.error);
+          return false;
+        }
+
+        case MessageType.UPLOAD_PROGRESS: {
+          // Relay to popup and content scripts
+          browser.runtime.sendMessage(message).catch(() => {});
+          browser.tabs.query({}).then((tabs) => {
+            for (const tab of tabs) {
+              if (tab.id) browser.tabs.sendMessage(tab.id, message).catch(() => {});
+            }
+          });
+          return false;
+        }
+
+        case MessageType.UPLOAD_COMPLETE: {
+          const msg = message as any;
+          console.log(`[background] upload complete: ${msg.url}`);
+          // Store upload result for publishing
+          uploadResult = { url: msg.url, sha256: msg.sha256, size: msg.size };
+          setState('publishing');
+          // Trigger Nostr publishing
+          browser.runtime.sendMessage({
+            type: MessageType.PUBLISH_NOTE,
+            target: 'offscreen',
+            blossomUrl: msg.url,
+            sha256: msg.sha256,
+            size: msg.size,
+          }).catch(console.error);
+          return false;
+        }
+
+        case MessageType.UPLOAD_ERROR: {
+          console.error('[background] upload error:', (message as any).error);
+          setState('error');
+          return false;
+        }
+
+        case MessageType.PUBLISH_COMPLETE: {
+          const msg = message as any;
+          console.log(`[background] published note: ${msg.noteId}`);
+          publishResult = { noteId: msg.noteId, blossomUrl: msg.blossomUrl };
           setState('complete');
           return false;
+        }
+
+        case MessageType.PUBLISH_ERROR: {
+          console.error('[background] publish error:', (message as any).error);
+          // Publishing failed but upload succeeded — still go to complete
+          if (uploadResult) {
+            publishResult = { noteId: '', blossomUrl: uploadResult.url };
+            setState('complete');
+          } else {
+            setState('error');
+          }
+          return false;
+        }
+
+        case MessageType.START_UPLOAD: {
+          // Manual retry from popup (or auto-trigger won't hit here since background is sender)
+          setState('uploading');
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                type: MessageType.START_UPLOAD,
+                target: 'offscreen',
+              }),
+            )
+            .catch(console.error);
+          sendResponse({ ok: true });
+          return false;
+        }
+
+        case MessageType.NIP07_SIGN:
+        case MessageType.NIP07_GET_PUBKEY: {
+          // Route to content script in the active tab
+          relayToContentScript(message)
+            .then((result) => sendResponse(result))
+            .catch((err) => sendResponse({ ok: false, error: err.message }));
+          return true; // async sendResponse
         }
 
         default:

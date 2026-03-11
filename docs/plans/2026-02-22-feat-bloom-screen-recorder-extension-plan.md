@@ -285,11 +285,8 @@ Add webcam overlay composited into the screen recording.
 - [x] Implement webcam capture in offscreen document
   - `getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } })`
   - Separate stream from screen capture
-- [x] Implement canvas compositing (in `entrypoints/offscreen/main.ts`)
-  - Uses mediabunny's `CanvasSource` with `OffscreenCanvas` at screen resolution
-  - Each frame: draw screen frame, then draw webcam frame as circle in bottom-left
-  - Webcam circle: 60px radius, 2px white border, positioned 24px from bottom-left
-  - Falls back to `MediaStreamVideoTrackSource` when webcam unavailable
+- [x] ~~Implement canvas compositing in offscreen document~~
+  - **Architecture change:** Webcam compositing moved to content script overlay. Tab capture naturally includes the overlay, so the offscreen document just records the raw screen via `MediaStreamVideoTrackSource`. This eliminates double-overlay issues and simplifies the pipeline.
 - [x] Handle webcam toggle (on/off during recording)
   - When off, draw screen frame only (no webcam)
   - State communicated via TOGGLE_WEBCAM message through service worker
@@ -314,29 +311,23 @@ Add webcam overlay composited into the screen recording.
 Build the recording overlay UI injected into web pages.
 
 **Tasks:**
-- [ ] Create Shadow DOM container for style isolation (`src/content/ui.ts`)
-  - Attach shadow root to a fixed-position div
-  - All styles scoped within shadow DOM
-- [ ] Implement webcam preview bubble
-  - Shows local webcam feed (separate `getUserMedia` call from content script context, or receive frames from offscreen doc via `BroadcastChannel`)
-  - Circular shape, bottom-left position
-  - Draggable within the viewport (v1: fixed position to match composite)
-  - Click to toggle webcam on/off (sends message to offscreen doc)
-- [ ] Implement recording controls bar
-  - Timer display (MM:SS)
-  - Pause/resume button (pauses frame capture, not the stream)
-  - Stop button (sends stop message to service worker)
-  - Mic mute/unmute toggle
-  - Minimize controls option
-- [ ] Implement countdown overlay (3, 2, 1) before recording starts
-- [ ] Implement restricted page fallback
-  - On pages where content script can't inject (chrome://, Web Store, etc.):
-  - Use `chrome.action.setBadgeText()` to show "REC" on the extension icon
-  - User stops recording by clicking extension icon -> popup shows stop button
-  - No webcam preview or overlay on these pages
-- [ ] Handle page navigation during recording
-  - Content script re-injects on new page (via `content_scripts` manifest entry)
-  - Restore UI state (recording in progress, timer position) from `chrome.storage.session`
+- [x] Create Shadow DOM container for style isolation
+  - WXT `createShadowRootUi` with `position: 'overlay'`, `cssInjectionMode: 'ui'`
+- [x] Implement webcam preview bubble
+  - Separate `getUserMedia` call from content script context
+  - Circular shape, bottom-left, fixed position
+  - Click to toggle webcam on/off
+  - Pre-acquired during `awaiting_media` state to hide camera spinup latency
+- [x] Implement recording controls bar
+  - Timer display (MM:SS), stop button, mic mute/unmute toggle
+  - Pause/resume and minimize deferred to v2
+- [ ] Implement countdown overlay (3, 2, 1) before recording starts (deferred to v2)
+- [x] Implement restricted page fallback
+  - `chrome.action.setBadgeText()` shows "REC" on extension icon
+  - Popup shows stop button when recording
+- [x] Handle page navigation during recording
+  - Content script re-injects on new page (manifest `content_scripts`)
+  - Restores UI state from `chrome.storage.local`
 
 **Note on webcam preview approach:** Calling `getUserMedia()` from a content script shows the page's origin in the permission prompt and may be blocked by `Permissions-Policy` headers. For v1, accept this limitation. If the webcam preview fails in the content script, show a static "camera" icon instead — the actual webcam compositing in the offscreen document is unaffected.
 
@@ -356,50 +347,24 @@ Build the recording overlay UI injected into web pages.
 Implement the Nostr signer bridge for authentication.
 
 **Tasks:**
-- [ ] Create main-world bridge script (`src/content/nip07-bridge.js`)
-  - Injected into page's main world via `<script>` tag (web_accessible_resources)
+- [x] Create main-world bridge script (`entrypoints/nostr-bridge.ts`)
+  - Injected into page's main world via WXT `injectScript()` + `web_accessible_resources`
   - Accesses `window.nostr` (NIP-07 signer)
   - Communicates with isolated-world content script via `window.postMessage`
   - Uses a unique, unguessable channel ID per session to prevent spoofing
-  ```js
-  // nip07-bridge.js (runs in main world)
-  const CHANNEL = '__bloom_nip07_' + crypto.randomUUID();
-  window.postMessage({ type: 'bloom-bridge-ready', channel: CHANNEL }, '*');
-
-  window.addEventListener('message', async (event) => {
-    if (event.data?.channel !== CHANNEL) return;
-    if (event.data?.type === 'getPublicKey') {
-      const pk = await window.nostr.getPublicKey();
-      window.postMessage({ channel: CHANNEL, type: 'publicKey', data: pk }, '*');
-    }
-    if (event.data?.type === 'signEvent') {
-      const signed = await window.nostr.signEvent(event.data.event);
-      window.postMessage({ channel: CHANNEL, type: 'signedEvent', data: signed }, '*');
-    }
-  });
-  ```
-- [ ] Create isolated-world NIP-07 proxy in content script (`src/content/nip07-proxy.ts`)
-  - Injects the bridge script into the page
-  - Listens for `postMessage` responses
-  - Exposes `getPublicKey()` and `signEvent()` methods to the extension
-  - Relays signing requests from service worker/offscreen doc
-- [ ] Create NIP07Signer adapter (`src/shared/nip07-signer.ts`)
-  - Implements the `Signer` interface from both `blossom-client-sdk` and `nostr-tools`
-  - Routes signing requests through the content script proxy
-- [ ] Handle CSP restrictions
-  - If page CSP blocks inline script injection, fall back to:
-    1. Try `chrome.scripting.executeScript()` with `world: 'MAIN'` (requires `activeTab` or `<all_urls>`)
-    2. If that fails, prompt user to complete signing in the popup (open popup with signing request)
-- [ ] Handle NIP-07 not available
-  - On extension startup / popup open, check for NIP-07 availability
-  - If not found, show clear message: "Install a Nostr signer extension (nos2x, Alby) to use Bloom"
-  - Block recording until signer is available (recording without ability to upload is pointless)
-- [ ] Handle signing during upload (post-recording)
-  - After recording stops, user may have navigated to a restricted page
-  - If content script NIP-07 proxy is unavailable, queue signing requests
-  - Show popup notification: "Bloom needs to sign — click to complete"
-  - Popup can also serve as NIP-07 proxy if it injects a bridge script into its own page context (though popup runs as extension page, not a web page — `window.nostr` won't be available there either)
-  - Fallback: retry signing when user navigates to a non-restricted page
+  - Request/response matched by unique `id` field per request
+- [x] Create isolated-world NIP-07 proxy in content script (`entrypoints/overlay.content/index.ts`)
+  - Injects bridge script via `injectScript('/nostr-bridge.js')`
+  - Listens for bridge ready message and captures channel ID
+  - Handles NIP07_SIGN and NIP07_GET_PUBKEY messages from background
+  - Routes signing requests through bridge via `window.postMessage`
+  - 60s timeout for signing requests (user may need to approve in signer)
+- [x] Create NIP07Signer adapter (inline in `entrypoints/offscreen/main.ts`)
+  - `createSigner()` returns `Signer` compatible with `blossom-client-sdk`
+  - Routes via `browser.runtime.sendMessage` → background → content script → bridge
+- [ ] Handle CSP restrictions (deferred to v2)
+- [ ] Handle NIP-07 not available (deferred to v2 — errors propagate via UPLOAD_ERROR)
+- [ ] Handle signing during upload on restricted pages (deferred to v2)
 
 **Security considerations:**
 - Never pass private keys — NIP-07 handles signing internally
@@ -423,32 +388,22 @@ Implement the Nostr signer bridge for authentication.
 Implement file upload to Blossom servers.
 
 **Tasks:**
-- [ ] Integrate `blossom-client-sdk` in offscreen document (`src/offscreen/uploader.ts`)
-  - Upload runs in offscreen document (has network access, doesn't depend on content script)
-  - NIP-07 signing is proxied: offscreen doc requests signature -> service worker -> content script -> NIP-07 -> back
-- [ ] Implement pre-flight check flow
-  - `HEAD /upload` with `X-SHA-256`, `X-Content-Length`, `X-Content-Type` headers
-  - Parse response: 200 (accepted), 413 (too large), 415 (unsupported type), 401 (auth required)
-  - On 413: show file size vs. server limit, suggest shorter recording or different server
-- [ ] Implement primary upload
-  - `PUT /upload` with raw MP4 bytes and `Authorization: Nostr <base64>` header
-  - Track upload progress for UI (use `fetch` with `ReadableStream` for progress or XHR)
-- [ ] Implement multi-server mirroring
-  - After primary upload succeeds, `PUT /mirror` to each additional configured server
-  - Use `blossom-client-sdk`'s `multiServerUpload` function
-  - Mirror failures are non-fatal — log and continue
-- [ ] Implement upload progress reporting
-  - Offscreen doc sends progress messages to service worker
-  - Service worker relays to popup (if open) and content script
-  - Show: bytes uploaded / total bytes, current server name, mirror status
-- [ ] Implement retry logic
-  - On network failure: exponential backoff, max 3 retries
-  - On auth expiry: re-sign and retry
-  - After all retries fail: persist MP4 in IndexedDB, show "Upload failed — retry later" in popup
-- [ ] Implement IndexedDB persistence (`src/offscreen/storage.ts`)
-  - Store completed MP4 blobs with metadata (hash, size, timestamp, target servers)
-  - On popup open: check for pending uploads, offer retry
-  - Clear after successful upload + mirror
+- [x] Integrate `blossom-client-sdk` in offscreen document (`entrypoints/offscreen/main.ts`)
+  - Upload runs in offscreen document (has network access)
+  - NIP-07 signing proxied: offscreen → background → content script → nostr-bridge → NIP-07
+  - `BlossomClient` with `auth: true` handles Blossom auth event creation + signing
+- [ ] Implement pre-flight check flow (deferred to v2)
+- [x] Implement primary upload
+  - `BlossomClient.uploadBlob()` handles PUT /upload with auth header
+  - Returns `BlobDescriptor` with url, sha256, size
+- [ ] Implement multi-server mirroring (deferred to v2 — uploads to primary server only)
+- [x] Implement upload progress reporting
+  - Offscreen sends UPLOAD_PROGRESS → background relays to popup + content scripts
+  - Popup shows "Uploading to <server>... XX%"
+- [ ] Implement retry logic (deferred to v2 — manual retry via popup button)
+- [x] Implement IndexedDB persistence
+  - Recordings stored with hash, data, size, duration, timestamp, uploaded flag
+  - Popup offers retry button on upload failure
 
 **Acceptance criteria:**
 - [ ] MP4 uploads to blossom.band (or configured server) successfully
@@ -487,22 +442,18 @@ Publish a note with the video link after upload.
     ],
   };
   ```
-- [ ] Sign via NIP-07 and publish to relays
+- [x] Sign via NIP-07 and publish to relays
   - `await Promise.any(pool.publish(relays, signedEvent))`
   - At least one relay acceptance = success
-- [ ] Publish kind 10063 server list (BUD-03)
-  - When user configures Blossom servers, publish/update their server list
-  - Replaceable event — only latest version is kept
-- [ ] Generate shareable links
-  - Blossom direct URL: `https://<server>/<sha256>.mp4`
-  - Viewer page URL: `https://bloom-viewer.example.com/v/<sha256>?s=<server1>&s=<server2>`
-  - Nostr note ID (for Nostr clients): `note1...` / `nevent1...`
-- [ ] Add optional caption input
-  - Before publishing, show a text field for the user to add a caption/description
-  - Default: empty (just the video URL)
-- [ ] Offer "skip publishing" option
-  - Some users may want to upload to Blossom without publishing a Nostr note
-  - Checkbox: "Publish to Nostr" (default: checked)
+  - Implemented in `entrypoints/offscreen/main.ts` `publishNote()`
+- [ ] Publish kind 10063 server list (BUD-03) (deferred to v2)
+- [x] Generate shareable links
+  - Blossom direct URL shown in popup on complete state
+  - Copy Link button copies URL to clipboard
+- [ ] Add optional caption input (deferred to v2)
+- [x] Offer "skip publishing" option
+  - `publishToNostr` setting in `utils/settings.ts` (default: true)
+  - When false, skips `publishNote()` and goes straight to complete
 
 **Acceptance criteria:**
 - [ ] Kind 1 note publishes to at least one relay

@@ -1,4 +1,5 @@
 import { MessageType, type Message } from '@/utils/messages';
+import { getSettings } from '@/utils/settings';
 import {
   Output,
   Mp4OutputFormat,
@@ -10,6 +11,8 @@ import {
   type VideoCodec,
   type AudioCodec,
 } from 'mediabunny';
+import { BlossomClient } from 'blossom-client-sdk';
+import { SimplePool } from 'nostr-tools/pool';
 
 console.log('[offscreen] document loaded');
 
@@ -266,6 +269,150 @@ async function getLatestRecording(): Promise<{ dataUrl: string; duration: number
   });
 }
 
+// --- NIP-07 Signer (routes through background -> content script -> nostr-bridge) ---
+
+function createSigner() {
+  return async (draft: { kind: number; content: string; tags: string[][]; created_at: number }) => {
+    const response = await browser.runtime.sendMessage({
+      type: MessageType.NIP07_SIGN,
+      event: draft,
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || 'Signing failed');
+    }
+    return response.data;
+  };
+}
+
+async function getPublicKey(): Promise<string> {
+  const response = await browser.runtime.sendMessage({
+    type: MessageType.NIP07_GET_PUBKEY,
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Failed to get public key');
+  }
+  return response.data;
+}
+
+// --- Blossom Upload ---
+
+async function uploadRecording() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+
+    const recording = await new Promise<any>((resolve, reject) => {
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const recordings = req.result;
+        if (!recordings || recordings.length === 0) {
+          reject(new Error('No recording found'));
+          return;
+        }
+        recordings.sort((a: any, b: any) => b.timestamp - a.timestamp);
+        resolve(recordings[0]);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+
+    const blob = new Blob([recording.data], { type: 'video/mp4' });
+    const settings = await getSettings();
+    const primaryServer = settings.blossomServers[0];
+    if (!primaryServer) throw new Error('No Blossom server configured');
+
+    console.log(`[offscreen] uploading ${blob.size} bytes to ${primaryServer}`);
+
+    const signer = createSigner();
+    const client = new BlossomClient(primaryServer, signer);
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_PROGRESS,
+      bytesUploaded: 0,
+      totalBytes: blob.size,
+      serverName: primaryServer,
+    });
+
+    const descriptor = await client.uploadBlob(blob, { auth: true });
+
+    console.log(`[offscreen] upload complete:`, descriptor);
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_COMPLETE,
+      url: descriptor.url,
+      sha256: descriptor.sha256,
+      size: descriptor.size,
+    });
+  } catch (err) {
+    console.error('[offscreen] upload error:', err);
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_ERROR,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// --- Nostr Publishing ---
+
+async function publishNote(blossomUrl: string, sha256: string, size: number) {
+  try {
+    const settings = await getSettings();
+    if (!settings.publishToNostr) {
+      console.log('[offscreen] Nostr publishing disabled');
+      browser.runtime.sendMessage({
+        type: MessageType.PUBLISH_COMPLETE,
+        noteId: '',
+        blossomUrl,
+      });
+      return;
+    }
+
+    const signer = createSigner();
+
+    const draft = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      content: blossomUrl,
+      tags: [
+        ['r', blossomUrl],
+        ['imeta',
+          `url ${blossomUrl}`,
+          `x ${sha256}`,
+          `m video/mp4`,
+          `size ${size}`,
+          `alt Screen recording`,
+        ],
+      ],
+    };
+
+    const signedEvent = await signer(draft);
+    console.log('[offscreen] signed note event:', signedEvent.id);
+
+    const pool = new SimplePool();
+    const relays = settings.nostrRelays;
+
+    const publishPromises = pool.publish(relays, signedEvent);
+    // Wait for at least one relay to accept
+    const firstRelay = await Promise.any(publishPromises);
+    console.log(`[offscreen] published to relay: ${firstRelay}`);
+
+    pool.close(relays);
+
+    browser.runtime.sendMessage({
+      type: MessageType.PUBLISH_COMPLETE,
+      noteId: signedEvent.id,
+      blossomUrl,
+    });
+  } catch (err) {
+    console.error('[offscreen] publish error:', err);
+    browser.runtime.sendMessage({
+      type: MessageType.PUBLISH_ERROR,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 // Message handler
 browser.runtime.onMessage.addListener(
   (message: Message, _sender, sendResponse) => {
@@ -298,6 +445,18 @@ browser.runtime.onMessage.addListener(
       case MessageType.GET_RECORDING:
         getLatestRecording().then(sendResponse);
         return true;
+
+      case MessageType.START_UPLOAD:
+        uploadRecording();
+        sendResponse({ ok: true });
+        return false;
+
+      case MessageType.PUBLISH_NOTE: {
+        const msg = message as any;
+        publishNote(msg.blossomUrl, msg.sha256, msg.size);
+        sendResponse({ ok: true });
+        return false;
+      }
 
       default:
         return false;

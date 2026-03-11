@@ -21,27 +21,39 @@ btnDownload.className = 'btn-stop';
 btnDownload.textContent = 'Download MP4';
 btnDownload.style.display = 'none';
 
+const btnCopy = document.createElement('button');
+btnCopy.className = 'btn-copy';
+btnCopy.textContent = 'Copy Link';
+btnCopy.style.display = 'none';
+
+const btnRetry = document.createElement('button');
+btnRetry.className = 'btn-retry';
+btnRetry.textContent = 'Retry Upload';
+btnRetry.style.display = 'none';
+
 const btnReset = document.createElement('button');
 btnReset.className = 'btn-reset';
 btnReset.textContent = 'New Recording';
 btnReset.style.display = 'none';
 
+const resultLink = document.createElement('a');
+resultLink.className = 'result-link';
+resultLink.target = '_blank';
+resultLink.style.display = 'none';
+
 const status = document.createElement('div');
 status.className = 'status';
 status.textContent = 'Ready';
 
-app.append(logo, btnRecord, btnStop, btnDownload, btnReset, status);
+app.append(logo, btnRecord, btnStop, btnDownload, btnCopy, btnRetry, btnReset, resultLink, status);
 
 btnRecord.addEventListener('click', async () => {
-  // Check if camera/mic permissions are already granted
   const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
   const micStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
 
   if (camStatus.state === 'granted' && micStatus.state === 'granted') {
-    // Permissions already granted, start directly
     await browser.runtime.sendMessage({ type: MessageType.START_RECORDING });
   } else {
-    // Open permissions page in a new tab (popup can't show permission dialogs)
     await browser.tabs.create({ url: browser.runtime.getURL('/permissions.html') });
   }
 });
@@ -72,14 +84,32 @@ btnDownload.addEventListener('click', async () => {
   }
 });
 
+btnCopy.addEventListener('click', async () => {
+  const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });
+  const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
+  if (url) {
+    await navigator.clipboard.writeText(url);
+    btnCopy.textContent = 'Copied!';
+    setTimeout(() => { btnCopy.textContent = 'Copy Link'; }, 2000);
+  }
+});
+
+btnRetry.addEventListener('click', async () => {
+  await browser.runtime.sendMessage({ type: MessageType.START_UPLOAD, target: 'offscreen' });
+});
+
 btnReset.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
 });
 
-// Listen for state updates
+// Listen for state updates and upload progress
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === MessageType.STATE_CHANGED) {
     updateUI(message.state);
+  }
+  if (message.type === MessageType.UPLOAD_PROGRESS) {
+    const pct = Math.round((message.bytesUploaded / message.totalBytes) * 100);
+    status.textContent = `Uploading to ${message.serverName}... ${pct}%`;
   }
 });
 
@@ -96,16 +126,29 @@ const STATE_LABELS: Record<ExtensionState, string> = {
   recording: 'Recording',
   finalizing: 'Saving...',
   uploading: 'Uploading...',
-  publishing: 'Publishing...',
-  complete: 'Recording saved',
-  error: 'Error',
+  publishing: 'Publishing to Nostr...',
+  complete: 'Done!',
+  error: 'Upload failed',
 };
 
-function updateUI(state: ExtensionState) {
+async function updateUI(state: ExtensionState) {
   status.textContent = STATE_LABELS[state] || state;
 
   btnRecord.style.display = state === 'idle' ? 'block' : 'none';
   btnStop.style.display = state === 'recording' ? 'block' : 'none';
   btnDownload.style.display = state === 'complete' ? 'block' : 'none';
+  btnCopy.style.display = state === 'complete' ? 'block' : 'none';
+  btnRetry.style.display = state === 'error' ? 'block' : 'none';
   btnReset.style.display = ['complete', 'error'].includes(state) ? 'block' : 'none';
+  resultLink.style.display = 'none';
+
+  if (state === 'complete') {
+    const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });
+    const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
+    if (url) {
+      resultLink.href = url;
+      resultLink.textContent = url;
+      resultLink.style.display = 'block';
+    }
+  }
 }
