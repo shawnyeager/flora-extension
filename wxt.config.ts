@@ -12,9 +12,5 @@ export default defineConfig({
       'scripting',
     ],
     host_permissions: ['<all_urls>'],
-    web_accessible_resources: [{
-      resources: ['nostr-bridge.js'],
-      matches: ['<all_urls>'],
-    }],
   },
 });

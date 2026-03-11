@@ -19,62 +19,11 @@ export default defineContentScript({
     let videoLoaded = false;
     let confirmLocked = false;
 
-    // ==========================================
-    // NIP-07 Bridge
-    // ==========================================
-    let bridgeChannel: string | null = null;
-    const pendingRequests = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
-
-    window.addEventListener('message', (event) => {
-      if (event.source !== window) return;
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-
-      if (data.type === 'bloom:bridge:ready' && data.channel) {
-        bridgeChannel = data.channel;
-        return;
-      }
-
-      if (data.channel === bridgeChannel && data.id && pendingRequests.has(data.id)) {
-        const pending = pendingRequests.get(data.id)!;
-        pendingRequests.delete(data.id);
-        if (data.type === 'bloom:error') {
-          pending.reject(new Error(data.error));
-        } else {
-          pending.resolve(data.data);
-        }
-      }
-    });
-
-    function bridgeRequest(type: string, payload?: Record<string, any>): Promise<any> {
-      return new Promise((resolve, reject) => {
-        if (!bridgeChannel) {
-          reject(new Error('NIP-07 bridge not ready. Is a signer extension installed?'));
-          return;
-        }
-        const id = crypto.randomUUID();
-        pendingRequests.set(id, { resolve, reject });
-        window.postMessage({ channel: bridgeChannel, type, id, ...payload }, '*');
-        setTimeout(() => {
-          if (pendingRequests.has(id)) {
-            pendingRequests.delete(id);
-            reject(new Error('NIP-07 request timed out'));
-          }
-        }, 60_000);
-      });
-    }
-
     ctx.onInvalidated(() => {
       webcamAborted = true;
       webcamStream?.getTracks().forEach((t) => t.stop());
       webcamStream = null;
     });
-
-    try {
-      await injectScript('/nostr-bridge.js', { keepInDom: true });
-    } catch {
-      // Bridge injection can fail on restricted pages — NIP-07 won't work there
-    }
 
     // ==========================================
     // Helpers
@@ -322,7 +271,7 @@ export default defineContentScript({
 
       q('.br-settings').addEventListener('click', (e) => {
         e.preventDefault();
-        window.open(browser.runtime.getURL('/settings.html'), '_blank');
+        browser.runtime.sendMessage({ type: 'open_settings' });
       });
 
       q('.br-btn-upload').addEventListener('click', () => {
@@ -614,27 +563,6 @@ export default defineContentScript({
         (panel.querySelector('.br-progress-detail') as HTMLElement).textContent =
           `${fmtBytes(message.bytesUploaded)} / ${fmtBytes(message.totalBytes)} to ${message.serverName}`;
         return false;
-      }
-
-      // NIP-07 relay (for offscreen document signing during upload)
-      if (message.type === MessageType.NIP07_GET_PUBKEY) {
-        bridgeRequest('bloom:getPublicKey')
-          .then((pubkey) => {
-            if (pubkey) {
-              sendResponse({ ok: true, data: pubkey });
-            } else {
-              sendResponse({ ok: false, error: 'Signer returned empty pubkey' });
-            }
-          })
-          .catch((err) => sendResponse({ ok: false, error: err.message }));
-        return true;
-      }
-
-      if (message.type === MessageType.NIP07_SIGN) {
-        bridgeRequest('bloom:signEvent', { event: message.event })
-          .then((signed) => sendResponse({ ok: true, data: signed }))
-          .catch((err) => sendResponse({ ok: false, error: err.message }));
-        return true;
       }
 
       return false;

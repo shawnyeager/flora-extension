@@ -11,34 +11,6 @@ let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let recordingTabId: number | null = null;
 
-async function relayToContentScript(message: Message): Promise<any> {
-  // Build ordered list: recording tab first (user is looking at it), then active, then others
-  const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-  const allTabs = await browser.tabs.query({});
-  const tabIds: number[] = [];
-  if (recordingTabId) tabIds.push(recordingTabId);
-  if (activeTab?.id && !tabIds.includes(activeTab.id)) tabIds.push(activeTab.id);
-  for (const tab of allTabs) {
-    if (tab.id && !tabIds.includes(tab.id)) tabIds.push(tab.id);
-  }
-
-  let lastError: string | undefined;
-  for (const id of tabIds) {
-    try {
-      const result = await browser.tabs.sendMessage(id, message);
-      // If the content script returned an error response, try other tabs
-      if (result?.ok === false) {
-        lastError = result.error || 'Unknown error from content script';
-        continue;
-      }
-      return result;
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error(lastError || 'No content script available for NIP-07 signing');
-}
 
 function setState(state: ExtensionState) {
   currentState = state;
@@ -117,6 +89,37 @@ async function probeNip07Direct(tabId: number): Promise<{ pubkey: string } | { e
     return results?.[0]?.result || { error: 'scripting.executeScript returned no result' };
   } catch (err: any) {
     return { error: err.message };
+  }
+}
+
+async function getPubkeyDirect(tabId: number): Promise<{ ok: true; data: string } | { ok: false; error: string }> {
+  const result = await probeNip07Direct(tabId);
+  if ('pubkey' in result) return { ok: true, data: result.pubkey };
+  return { ok: false, error: result.error };
+}
+
+async function signEventDirect(
+  tabId: number,
+  event: { kind: number; content: string; tags: string[][]; created_at: number },
+): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      args: [event],
+      func: (evt: any) => {
+        const nostr = (window as any).nostr;
+        if (!nostr) return { ok: false, error: 'No NIP-07 signer found' };
+        if (typeof nostr.signEvent !== 'function') return { ok: false, error: 'window.nostr.signEvent is not a function' };
+        return nostr.signEvent(evt).then(
+          (signed: any) => signed ? { ok: true, data: signed } : { ok: false, error: 'signEvent returned empty' },
+          (err: any) => ({ ok: false, error: String(err) }),
+        );
+      },
+    });
+    return results?.[0]?.result || { ok: false, error: 'scripting.executeScript returned no result' };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
   }
 }
 
@@ -317,13 +320,28 @@ export default defineBackground(() => {
           return false;
         }
 
-        case MessageType.NIP07_SIGN:
         case MessageType.NIP07_GET_PUBKEY: {
-          // Route to content script in the active tab
-          relayToContentScript(message)
+          const tabId = recordingTabId || _sender.tab?.id;
+          if (!tabId) {
+            sendResponse({ ok: false, error: 'No tab available for NIP-07' });
+            return false;
+          }
+          getPubkeyDirect(tabId)
             .then((result) => sendResponse(result))
             .catch((err) => sendResponse({ ok: false, error: err.message }));
-          return true; // async sendResponse
+          return true;
+        }
+
+        case MessageType.NIP07_SIGN: {
+          const tabId = recordingTabId || _sender.tab?.id;
+          if (!tabId) {
+            sendResponse({ ok: false, error: 'No tab available for NIP-07' });
+            return false;
+          }
+          signEventDirect(tabId, (message as any).event)
+            .then((result) => sendResponse(result))
+            .catch((err) => sendResponse({ ok: false, error: err.message }));
+          return true;
         }
 
         case MessageType.GET_CONFIRM_DATA: {
@@ -366,6 +384,11 @@ export default defineBackground(() => {
         case MessageType.BACK_TO_PREVIEW: {
           setState('preview');
           sendResponse({ ok: true });
+          return false;
+        }
+
+        case 'open_settings': {
+          browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
           return false;
         }
 

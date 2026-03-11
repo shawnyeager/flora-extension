@@ -269,7 +269,7 @@ async function getLatestRecording(): Promise<{ dataUrl: string; duration: number
   });
 }
 
-// --- NIP-07 Signer (routes through background -> content script -> nostr-bridge) ---
+// --- NIP-07 Signer (routes through background -> scripting.executeScript in recording tab) ---
 
 function createSigner() {
   return async (draft: { kind: number; content: string; tags: string[][]; created_at: number }) => {
