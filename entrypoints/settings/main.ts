@@ -1,5 +1,4 @@
 import { getSettings, saveSettings } from '@/utils/settings';
-import { MessageType } from '@/utils/messages';
 
 const serversEl = document.getElementById('servers') as HTMLTextAreaElement;
 const relaysEl = document.getElementById('relays') as HTMLTextAreaElement;
@@ -15,21 +14,9 @@ async function loadSettings() {
   publishToggle.checked = settings.publishToNostr;
 }
 
-async function probeIdentity() {
-  try {
-    const response = await browser.runtime.sendMessage({
-      type: MessageType.NIP07_GET_PUBKEY,
-    });
-    if (response?.ok !== false && response?.data) {
-      identityEl.textContent = response.data;
-    } else {
-      identityEl.textContent = response?.error || 'No signer detected';
-      identityEl.style.color = '#f6ad55';
-    }
-  } catch {
-    identityEl.textContent = 'Could not reach signer';
-    identityEl.style.color = '#f6ad55';
-  }
+function showIdentityNote() {
+  identityEl.textContent = 'Detected from your NIP-07 signer when recording';
+  identityEl.style.color = '#a0aec0';
 }
 
 btnSave.addEventListener('click', async () => {
@@ -53,4 +40,4 @@ btnSave.addEventListener('click', async () => {
 });
 
 loadSettings();
-probeIdentity();
+showIdentityNote();
