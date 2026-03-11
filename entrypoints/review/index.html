@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bloom - Review Recording</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Bloom</h1>
+      <a href="#" id="settings-link" class="settings-link">Settings</a>
+    </header>
+
+    <div id="view-preview" class="view">
+      <video id="preview-video" controls></video>
+      <div id="preview-meta" class="meta"></div>
+
+      <div class="destination-card">
+        <h2>Upload destination</h2>
+        <div class="field">
+          <label>Blossom server</label>
+          <div id="dest-server" class="field-value"></div>
+        </div>
+        <div class="field" id="relay-section">
+          <label>Nostr relays</label>
+          <div id="dest-relays" class="field-value"></div>
+        </div>
+        <div class="field">
+          <label>Identity</label>
+          <div id="dest-identity" class="field-value"></div>
+        </div>
+      </div>
+
+      <div id="signer-warning" class="warning" style="display:none"></div>
+
+      <div class="actions">
+        <button id="btn-upload" class="btn-primary">Upload & Share…</button>
+        <button id="btn-download" class="btn-secondary">Download MP4</button>
+        <button id="btn-discard" class="btn-ghost">Discard</button>
+      </div>
+    </div>
+
+    <div id="view-confirm" class="view" style="display:none">
+      <video id="confirm-video" controls></video>
+      <div id="confirm-meta" class="meta"></div>
+
+      <div class="destination-card editable">
+        <h2>Review before sharing</h2>
+        <div class="field">
+          <label for="confirm-server">Upload to</label>
+          <input type="text" id="confirm-server" class="field-input" placeholder="https://blossom.band" />
+        </div>
+        <div class="field">
+          <label class="check-label">
+            <input type="checkbox" id="confirm-publish" checked />
+            Publish note to Nostr
+          </label>
+          <div id="confirm-relays" class="field-sub"></div>
+        </div>
+        <div class="field">
+          <label>Signing as</label>
+          <div id="confirm-identity" class="field-value mono"></div>
+        </div>
+      </div>
+
+      <div id="confirm-warning" class="warning" style="display:none"></div>
+
+      <div class="actions">
+        <button id="btn-confirm" class="btn-primary">Confirm Upload</button>
+        <button id="btn-back" class="btn-secondary">Back</button>
+      </div>
+    </div>
+
+    <div id="view-progress" class="view" style="display:none">
+      <div class="progress-section">
+        <div id="progress-status" class="progress-text">Uploading…</div>
+        <div class="progress-bar-track">
+          <div id="progress-bar" class="progress-bar-fill" style="width:0%"></div>
+        </div>
+        <div id="progress-detail" class="progress-detail"></div>
+      </div>
+    </div>
+
+    <div id="view-complete" class="view" style="display:none">
+      <div class="complete-section">
+        <div class="complete-icon">&#10003;</div>
+        <div class="complete-title">Shared</div>
+        <a id="result-link" class="result-link" target="_blank"></a>
+        <div class="actions">
+          <button id="btn-copy" class="btn-primary">Copy Link</button>
+          <button id="btn-new" class="btn-secondary">New Recording</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-error" class="view" style="display:none">
+      <div class="error-section">
+        <div class="error-title">Upload failed</div>
+        <div id="error-message" class="error-message"></div>
+        <div class="actions">
+          <button id="btn-retry" class="btn-primary">Retry</button>
+          <button id="btn-error-discard" class="btn-ghost">Discard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="./main.ts" type="module"></script>
+</body>
+</html>

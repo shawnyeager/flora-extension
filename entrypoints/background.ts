@@ -53,11 +53,28 @@ function probeNip07() {
     });
 }
 
+function openReviewTab() {
+  const reviewUrl = browser.runtime.getURL('/review.html');
+  // Reuse existing review tab if open
+  browser.tabs.query({ url: reviewUrl }).then((tabs) => {
+    if (tabs.length > 0 && tabs[0].id) {
+      browser.tabs.update(tabs[0].id, { active: true });
+    } else {
+      browser.tabs.create({ url: reviewUrl });
+    }
+  });
+}
+
 function setState(state: ExtensionState) {
   currentState = state;
   browser.storage.local.set({ state });
 
-  // Send to extension pages (popup, offscreen)
+  // Open review tab when entering preview
+  if (state === 'preview') {
+    openReviewTab();
+  }
+
+  // Send to extension pages (popup, offscreen, review)
   browser.runtime.sendMessage({
     type: MessageType.STATE_CHANGED,
     state,
