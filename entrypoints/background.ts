@@ -42,8 +42,8 @@ function probeNip07() {
   cachedNip07 = null;
   relayToContentScript({ type: MessageType.NIP07_GET_PUBKEY } as Message)
     .then((result) => {
-      if (result?.ok !== false && result?.pubkey) {
-        cachedNip07 = { pubkey: result.pubkey };
+      if (result?.ok !== false && result?.data) {
+        cachedNip07 = { pubkey: result.data };
       } else {
         cachedNip07 = { error: result?.error || 'Unknown NIP-07 error' };
       }

@@ -20,8 +20,8 @@ async function probeIdentity() {
     const response = await browser.runtime.sendMessage({
       type: MessageType.NIP07_GET_PUBKEY,
     });
-    if (response?.ok !== false && response?.pubkey) {
-      identityEl.textContent = response.pubkey;
+    if (response?.ok !== false && response?.data) {
+      identityEl.textContent = response.data;
     } else {
       identityEl.textContent = response?.error || 'No signer detected';
       identityEl.style.color = '#f6ad55';
