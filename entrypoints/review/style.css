@@ -19,7 +19,7 @@ body {
 
 .container {
   width: 100%;
-  max-width: 540px;
+  max-width: var(--bl-container-width);
   animation: bl-fadein 0.3s var(--bl-ease);
 }
 
