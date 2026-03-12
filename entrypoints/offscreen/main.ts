@@ -643,9 +643,15 @@ async function publishNote(blossomUrl: string, sha256: string, size: number, rel
     const pool = new SimplePool();
 
     const publishPromises = pool.publish(relays, signedEvent);
-    // Wait for at least one relay to accept
-    const firstRelay = await Promise.any(publishPromises);
-    console.log(`[offscreen] published to relay: ${firstRelay}`);
+    // Wait for all relays to respond (with a timeout so we don't hang)
+    const results = await Promise.allSettled(
+      publishPromises.map((p) =>
+        Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))]),
+      ),
+    );
+    const accepted = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    console.log(`[offscreen] published to ${accepted}/${relays.length} relays (${failed} failed)`);
 
     pool.close(relays);
 
