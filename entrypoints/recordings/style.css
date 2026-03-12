@@ -556,11 +556,11 @@ body {
 .confirm-panel {
   position: relative;
   width: 90vw;
-  max-width: 420px;
+  max-width: 540px;
   background: var(--bl-bg-elevated, #1c1c22);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--bl-radius-lg);
-  padding: 24px;
+  padding: 28px;
 }
 
 .confirm-panel h2 {
@@ -635,9 +635,61 @@ body {
 .confirm-sub {
   font-size: 11px;
   color: var(--bl-text-muted);
-  margin-top: 6px;
-  padding-left: 24px;
+  margin-top: 8px;
   line-height: 1.6;
+}
+
+.confirm-note-field {
+  margin-top: 12px;
+}
+
+.confirm-note-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bl-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.confirm-note {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--bl-radius-sm);
+  color: var(--bl-text-primary);
+  font-family: var(--bl-font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.confirm-note::placeholder {
+  color: var(--bl-text-muted);
+}
+
+.confirm-note:focus {
+  outline: none;
+  border-color: var(--bl-violet);
+}
+
+.confirm-identity-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-identity-row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bl-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
 .confirm-warning {

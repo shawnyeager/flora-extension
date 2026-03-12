@@ -45,11 +45,17 @@
           <input type="checkbox" id="confirm-nostr" />
           Publish note to Nostr
         </label>
-        <div id="confirm-relays" class="confirm-sub"></div>
-      </div>
-      <div class="confirm-field">
-        <label>Signing as</label>
-        <div id="confirm-identity" class="confirm-value mono"></div>
+        <div id="confirm-nostr-details" style="display:none">
+          <div id="confirm-relays" class="confirm-sub"></div>
+          <div class="confirm-note-field">
+            <label for="confirm-note">Note</label>
+            <textarea id="confirm-note" class="confirm-note" rows="3" placeholder="Say something about this video…"></textarea>
+          </div>
+          <div class="confirm-identity-row">
+            <label>Signing as</label>
+            <div id="confirm-identity" class="confirm-value mono"></div>
+          </div>
+        </div>
       </div>
       <div id="confirm-warning" class="confirm-warning" style="display:none"></div>
       <div class="confirm-actions">

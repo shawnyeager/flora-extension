@@ -28,6 +28,8 @@ const confirmNostr = document.getElementById('confirm-nostr') as HTMLInputElemen
 const confirmRelays = document.getElementById('confirm-relays')!;
 const confirmIdentity = document.getElementById('confirm-identity')!;
 const confirmWarning = document.getElementById('confirm-warning')!;
+const confirmNostrDetails = document.getElementById('confirm-nostr-details')!;
+const confirmNote = document.getElementById('confirm-note') as HTMLTextAreaElement;
 const confirmUploadBtn = document.getElementById('confirm-upload-btn') as HTMLButtonElement;
 const confirmCancelBtn = document.getElementById('confirm-cancel-btn')!;
 
@@ -173,6 +175,8 @@ async function showUploadConfirm(rec: RecordingMeta) {
 
   confirmServer.textContent = data.server;
   confirmNostr.checked = data.publishToNostr;
+  confirmNote.value = '';
+  confirmNostrDetails.style.display = data.publishToNostr ? '' : 'none';
   updateRelayDisplay(data.relays);
   updateIdentityDisplay(data.npub, data.signerAvailable, data.bridgeError);
 }
@@ -183,12 +187,8 @@ function hideUploadConfirm() {
 }
 
 function updateRelayDisplay(relays: string[]) {
-  if (confirmNostr.checked && relays?.length) {
-    confirmRelays.textContent = relays.join(', ');
-    confirmRelays.style.display = '';
-  } else {
-    confirmRelays.style.display = 'none';
-  }
+  confirmRelays.textContent = relays?.length ? relays.join(', ') : '';
+  confirmRelays.style.display = confirmNostr.checked && relays?.length ? '' : 'none';
 }
 
 function updateIdentityDisplay(npub: string | null, signerAvailable: boolean, bridgeError: string | null) {
@@ -209,13 +209,7 @@ function updateIdentityDisplay(npub: string | null, signerAvailable: boolean, br
 }
 
 confirmNostr.addEventListener('change', () => {
-  // Toggle relay list visibility
-  const relayText = confirmRelays.textContent;
-  if (confirmNostr.checked && relayText) {
-    confirmRelays.style.display = '';
-  } else {
-    confirmRelays.style.display = 'none';
-  }
+  confirmNostrDetails.style.display = confirmNostr.checked ? '' : 'none';
   // Show/hide signer warning when no signer
   if (confirmIdentity.textContent === '—') {
     confirmWarning.style.display = confirmNostr.checked ? '' : 'none';
@@ -230,6 +224,7 @@ confirmUploadBtn.addEventListener('click', async () => {
     type: MessageType.UPLOAD_FROM_LIBRARY,
     hash: pendingHash,
     publishToNostr: confirmNostr.checked,
+    noteContent: confirmNostr.checked ? confirmNote.value.trim() : undefined,
   });
   if (!resp?.ok) {
     confirmUploadBtn.disabled = false;
