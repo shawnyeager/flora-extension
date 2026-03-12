@@ -1,7 +1,7 @@
 {
   "name": "bloom",
   "version": "0.1.0",
-  "description": "Decentralized screen recording powered by Nostr + Blossom",
+  "description": "Record your screen, share instantly. Your recordings, your servers.",
   "private": true,
   "type": "module",
   "scripts": {

@@ -131,16 +131,16 @@ document.addEventListener('keydown', (e) => {
 const STATE_LABELS: Record<ExtensionState, string> = {
   idle: '',
   initializing: 'Starting\u2026',
-  awaiting_media: 'Selecting screen\u2026',
-  countdown: 'Starting\u2026',
+  awaiting_media: 'Picking a screen\u2026',
+  countdown: 'Get ready\u2026',
   recording: 'Recording in progress',
-  finalizing: 'Saving\u2026',
-  preview: 'Review your recording',
-  confirming: 'Confirming\u2026',
+  finalizing: 'Wrapping up\u2026',
+  preview: 'Review your clip',
+  confirming: 'Almost there\u2026',
   uploading: 'Uploading\u2026',
   publishing: 'Publishing\u2026',
   complete: '',
-  error: 'Upload failed',
+  error: 'Something went wrong',
 };
 
 const RECORDING_STATES: ExtensionState[] = ['recording'];
@@ -308,7 +308,7 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
         publishToNostr: false,
       });
       if (!resp?.ok) {
-        upBtn.textContent = 'Busy';
+        upBtn.textContent = 'Not now';
         setTimeout(() => { upBtn.textContent = 'Upload'; }, 1500);
       }
     });
@@ -349,7 +349,7 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
   delBtn.setAttribute('aria-label', 'Delete');
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    if (!confirm('Delete this recording? This cannot be undone.')) return;
+    if (!confirm('Delete this recording? You can\u2019t undo this.')) return;
     await browser.runtime.sendMessage({
       type: MessageType.DELETE_RECORDING,
       hash: rec.hash,
@@ -437,7 +437,7 @@ bulkDeleteBtn.addEventListener('click', async () => {
 
   const count = hashes.length;
   const noun = count === 1 ? 'recording' : 'recordings';
-  if (!confirm(`Delete ${count} ${noun}? This cannot be undone.`)) return;
+  if (!confirm(`Delete ${count} ${noun}? You can\u2019t undo this.`)) return;
 
   await browser.runtime.sendMessage({
     type: MessageType.DELETE_RECORDINGS,

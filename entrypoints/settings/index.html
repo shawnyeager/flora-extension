@@ -16,36 +16,62 @@
       </div>
     </header>
 
-    <div class="group">
-      <h2 class="group-title">Connection</h2>
-
-      <div class="field">
-        <label class="field-label" for="servers">Blossom servers</label>
-        <textarea id="servers" rows="2" placeholder="https://blossom.band" spellcheck="false" autocomplete="off"></textarea>
-        <p class="field-hint">Upload destination. First URL is the default.</p>
+    <!-- Identity (read-only) -->
+    <section class="section" id="identity-section">
+      <h2 class="section-title">Nostr Identity</h2>
+      <div id="identity" class="identity-card">
+        <div class="identity-status">
+          <span class="identity-dot"></span>
+          <span class="identity-label">Checking&hellip;</span>
+        </div>
+        <div class="identity-pubkey" id="identity-pubkey">
+          <span class="identity-npub"></span>
+          <button class="identity-copy" aria-label="Copy public key" title="Copy public key" hidden></button>
+        </div>
       </div>
+    </section>
 
-      <div class="field">
-        <label class="field-label" for="relays">Nostr relays</label>
-        <textarea id="relays" rows="2" placeholder="wss://relay.damus.io" spellcheck="false" autocomplete="off"></textarea>
-        <p class="field-hint">One per line.</p>
+    <!-- Blossom Servers -->
+    <section class="section">
+      <h2 class="section-title">Blossom Servers</h2>
+      <p class="section-hint">Where your recordings are stored. First server is used for uploads.</p>
+      <div class="url-input-row">
+        <input type="url" id="server-input" class="url-input" placeholder="https://blossom.example.com" spellcheck="false" autocomplete="off">
+        <button class="url-add" id="server-add" aria-label="Add server">Add</button>
       </div>
+      <ul class="url-list" id="server-list"></ul>
+    </section>
 
-      <label class="toggle-row">
-        <input type="checkbox" id="publish-toggle">
-        <span>Publish to Nostr by default</span>
+    <!-- Nostr Relays -->
+    <section class="section">
+      <h2 class="section-title">Nostr Relays</h2>
+      <p class="section-hint">Where recording links are published so others can find them.</p>
+      <div class="url-input-row">
+        <input type="url" id="relay-input" class="url-input" placeholder="wss://relay.example.com" spellcheck="false" autocomplete="off">
+        <button class="url-add" id="relay-add" aria-label="Add relay">Add</button>
+      </div>
+      <ul class="url-list" id="relay-list"></ul>
+    </section>
+
+    <!-- Defaults -->
+    <section class="section">
+      <h2 class="section-title">Defaults</h2>
+      <label class="toggle-row" id="publish-row">
+        <span class="toggle-text">
+          <span class="toggle-label">Publish to Nostr</span>
+          <span class="toggle-hint">Post a note with the video link after each upload.</span>
+        </span>
+        <input type="checkbox" id="publish-toggle" role="switch">
+        <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
       </label>
-    </div>
+    </section>
 
-    <div class="group">
-      <h2 class="group-title">Identity</h2>
-      <div id="identity" class="identity-display">
-        <span class="identity-value"></span>
-        <span class="identity-hint"></span>
-      </div>
-    </div>
-
-    <button id="btn-save" class="btn-save">Save settings</button>
+    <!-- About -->
+    <section class="section section-about">
+      <span class="about-version">Bloom v0.1.0</span>
+      <span class="about-sep">&middot;</span>
+      <a href="https://github.com" class="about-link" target="_blank" rel="noopener">GitHub</a>
+    </section>
   </div>
   <script src="./main.ts" type="module"></script>
 </body>

@@ -150,18 +150,18 @@ browser.runtime.sendMessage({ type: MessageType.GET_STATE }).then((state) => {
 });
 
 const STATE_LABELS: Record<ExtensionState, string> = {
-  idle: 'Ready to record',
+  idle: 'Ready when you are',
   initializing: 'Starting\u2026',
-  awaiting_media: 'Select a screen\u2026',
-  countdown: 'Starting\u2026',
+  awaiting_media: 'Pick a screen\u2026',
+  countdown: 'Get ready\u2026',
   recording: 'Recording',
-  finalizing: 'Saving\u2026',
-  preview: 'Review your recording',
-  confirming: 'Confirming\u2026',
+  finalizing: 'Wrapping up\u2026',
+  preview: 'Review your clip',
+  confirming: 'Almost there\u2026',
   uploading: 'Uploading\u2026',
-  publishing: 'Publishing to Nostr\u2026',
+  publishing: 'Publishing\u2026',
   complete: 'Shared',
-  error: 'Upload failed',
+  error: 'Something went wrong',
 };
 
 const RECORDING_STATES: ExtensionState[] = ['recording'];
