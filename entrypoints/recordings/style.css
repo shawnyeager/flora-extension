@@ -679,7 +679,7 @@ body {
 .confirm-identity-row {
   margin-top: 12px;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
 }
 
@@ -690,6 +690,40 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   flex-shrink: 0;
+}
+
+.confirm-status {
+  padding: 12px 14px;
+  border-radius: var(--bl-radius-sm);
+  margin-top: 16px;
+}
+
+.confirm-status.uploading {
+  background: rgba(155, 110, 199, 0.08);
+  border: 1px solid rgba(155, 110, 199, 0.2);
+}
+
+.confirm-status.success {
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.confirm-status.error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.confirm-status-text {
+  font-size: 13px;
+  color: var(--bl-text-secondary);
+}
+
+.confirm-status.success .confirm-status-text {
+  color: var(--bl-green);
+}
+
+.confirm-status.error .confirm-status-text {
+  color: var(--bl-red);
 }
 
 .confirm-warning {

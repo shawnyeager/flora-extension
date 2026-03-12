@@ -30,8 +30,14 @@ const confirmIdentity = document.getElementById('confirm-identity')!;
 const confirmWarning = document.getElementById('confirm-warning')!;
 const confirmNostrDetails = document.getElementById('confirm-nostr-details')!;
 const confirmNote = document.getElementById('confirm-note') as HTMLTextAreaElement;
+const confirmStatus = document.getElementById('confirm-status')!;
+const confirmStatusText = document.getElementById('confirm-status-text')!;
+const confirmActions = document.getElementById('confirm-actions')!;
+const confirmDoneActions = document.getElementById('confirm-done-actions')!;
 const confirmUploadBtn = document.getElementById('confirm-upload-btn') as HTMLButtonElement;
 const confirmCancelBtn = document.getElementById('confirm-cancel-btn')!;
+const confirmCopyBtn = document.getElementById('confirm-copy-btn')!;
+const confirmCloseBtn = document.getElementById('confirm-close-btn')!;
 
 // --- State ---
 
@@ -155,9 +161,15 @@ async function showUploadConfirm(rec: RecordingMeta) {
   confirmThumb.alt = `Recording ${fmtDuration(rec.duration)}`;
   confirmInfo.textContent = `${fmtDuration(rec.duration)} · ${fmtBytes(rec.size)}`;
 
-  // Reset button state
+  // Reset UI state
   confirmUploadBtn.disabled = false;
   confirmUploadBtn.textContent = 'Confirm Upload';
+  confirmStatus.style.display = 'none';
+  confirmStatus.className = 'confirm-status';
+  confirmActions.style.display = '';
+  confirmDoneActions.style.display = 'none';
+  confirmCopyBtn.style.display = '';
+  pendingBlossomUrl = null;
 
   // Show overlay (data loads async)
   confirmOverlay.hidden = false;
@@ -184,6 +196,44 @@ async function showUploadConfirm(rec: RecordingMeta) {
 function hideUploadConfirm() {
   confirmOverlay.hidden = true;
   pendingHash = null;
+  pendingBlossomUrl = null;
+}
+
+let pendingBlossomUrl: string | null = null;
+
+function updateConfirmStatus(state: ExtensionState) {
+  if (state === 'uploading') {
+    confirmStatus.style.display = '';
+    confirmStatus.className = 'confirm-status uploading';
+    confirmStatusText.textContent = 'Uploading\u2026';
+    confirmActions.style.display = 'none';
+    confirmDoneActions.style.display = 'none';
+  } else if (state === 'publishing') {
+    confirmStatus.className = 'confirm-status uploading';
+    confirmStatusText.textContent = 'Publishing to Nostr\u2026';
+  } else if (state === 'complete') {
+    confirmStatus.className = 'confirm-status success';
+    confirmStatusText.textContent = confirmNostr.checked
+      ? 'Uploaded and published to Nostr.'
+      : 'Uploaded.';
+    confirmActions.style.display = 'none';
+    confirmDoneActions.style.display = '';
+    // Fetch the blossom URL for copy button
+    browser.runtime.sendMessage({ type: MessageType.GET_RESULT }).then((result: any) => {
+      if (result?.uploadResult?.url) pendingBlossomUrl = result.uploadResult.url;
+    });
+  } else if (state === 'error') {
+    confirmStatus.className = 'confirm-status error';
+    browser.runtime.sendMessage({ type: MessageType.GET_ERROR }).then((resp: any) => {
+      confirmStatusText.textContent = resp?.error || 'Upload failed';
+    });
+    confirmActions.style.display = 'none';
+    confirmDoneActions.style.display = '';
+    confirmCopyBtn.style.display = 'none';
+  } else if (state === 'idle') {
+    // Reset happened externally
+    hideUploadConfirm();
+  }
 }
 
 function updateRelayDisplay(relays: string[]) {
@@ -229,13 +279,26 @@ confirmUploadBtn.addEventListener('click', async () => {
   if (!resp?.ok) {
     confirmUploadBtn.disabled = false;
     confirmUploadBtn.textContent = 'Confirm Upload';
-  } else {
-    hideUploadConfirm();
   }
+  // Panel stays open — state listener handles progress/success/error
 });
 
 confirmCancelBtn.addEventListener('click', hideUploadConfirm);
 confirmBackdrop.addEventListener('click', hideUploadConfirm);
+
+confirmCopyBtn.addEventListener('click', async () => {
+  if (pendingBlossomUrl) {
+    await navigator.clipboard.writeText(pendingBlossomUrl);
+    confirmCopyBtn.textContent = 'Copied';
+    setTimeout(() => { confirmCopyBtn.textContent = 'Copy URL'; }, 1500);
+  }
+});
+
+confirmCloseBtn.addEventListener('click', () => {
+  hideUploadConfirm();
+  browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
+  loadRecordings();
+});
 
 // --- Status notice ---
 
@@ -571,9 +634,9 @@ browser.runtime.onMessage.addListener((message) => {
     if (message.state === 'idle' || message.state === 'complete' || message.state === 'preview') {
       loadRecordings();
     }
-    // Close confirmation panel when upload starts
-    if (message.state === 'uploading' && !confirmOverlay.hidden) {
-      hideUploadConfirm();
+    // Update confirmation panel with progress
+    if (!confirmOverlay.hidden) {
+      updateConfirmStatus(message.state);
     }
     // Update upload button states
     gridEl.querySelectorAll('.btn-upload').forEach((btn) => {
