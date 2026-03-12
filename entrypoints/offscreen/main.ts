@@ -89,7 +89,6 @@ async function startCapture() {
         bitrateMode: 'variable',
         latencyMode: 'realtime',
         keyFrameInterval: 3,
-        hardwareAcceleration: 'prefer-hardware',
         contentHint: 'detail',
         sizeChangeBehavior: 'contain',
       },
