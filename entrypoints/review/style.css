@@ -64,6 +64,7 @@ video {
   border-radius: 10px;
   background: #000;
   max-height: 400px;
+  aspect-ratio: 16 / 9;
 }
 
 .meta {

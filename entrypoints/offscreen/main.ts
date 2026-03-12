@@ -42,7 +42,7 @@ async function startCapture() {
     // 2. Acquire microphone
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch (err) {
       console.warn('[offscreen] mic not available, recording without mic:', err);
@@ -189,10 +189,14 @@ async function stopCapture() {
 function mixAudioTracks(tracks: MediaStreamTrack[]): MediaStreamTrack {
   const ctx = new AudioContext({ sampleRate: 48000 });
   const dest = ctx.createMediaStreamDestination();
+  // System audio is index 0, mic is index 1 (mic pushed last in audioTracks)
+  const micIndex = tracks.length - 1;
 
-  for (const track of tracks) {
-    const source = ctx.createMediaStreamSource(new MediaStream([track]));
-    source.connect(dest);
+  for (let i = 0; i < tracks.length; i++) {
+    const source = ctx.createMediaStreamSource(new MediaStream([tracks[i]]));
+    const gain = ctx.createGain();
+    gain.gain.value = i === micIndex ? 1.4 : 1.0;
+    source.connect(gain).connect(dest);
   }
 
   return dest.stream.getAudioTracks()[0];

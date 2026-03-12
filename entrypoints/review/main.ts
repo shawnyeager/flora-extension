@@ -87,17 +87,51 @@ function showView(view: HTMLDivElement) {
   for (const v of views) v.style.display = v === view ? 'flex' : 'none';
 }
 
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('bloom-recordings', 2);
+    req.onupgradeneeded = (event) => {
+      const db = req.result;
+      let store: IDBObjectStore;
+      if (!db.objectStoreNames.contains('recordings')) {
+        store = db.createObjectStore('recordings', { keyPath: 'hash' });
+      } else {
+        store = (event.target as IDBOpenDBRequest).transaction!.objectStore('recordings');
+      }
+      if (!store.indexNames.contains('by_timestamp')) {
+        store.createIndex('by_timestamp', 'timestamp');
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+let videoBlobUrl: string | null = null;
+
 async function loadVideo() {
   if (videoLoaded) return;
   try {
-    const result = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING });
-    if (result?.dataUrl) {
-      previewVideo.src = result.dataUrl;
-      confirmVideo.src = result.dataUrl;
+    const db = await openDB();
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+    const index = store.index('by_timestamp');
+
+    const record = await new Promise<any>((resolve) => {
+      const req = index.openCursor(null, 'prev');
+      req.onsuccess = () => resolve(req.result?.value ?? null);
+      req.onerror = () => resolve(null);
+    });
+    db.close();
+
+    if (record?.data) {
+      videoBlobUrl = URL.createObjectURL(new Blob([record.data], { type: 'video/mp4' }));
+      previewVideo.src = videoBlobUrl;
+      confirmVideo.src = videoBlobUrl;
       videoLoaded = true;
     }
-  } catch {
-    // offscreen may not be ready
+  } catch (err) {
+    console.error('[review] failed to load video from IndexedDB:', err);
   }
 }
 
@@ -117,8 +151,8 @@ async function getConfirmData(): Promise<ConfirmData | null> {
 }
 
 async function showPreview() {
-  showView(viewPreview);
   await loadVideo();
+  showView(viewPreview);
 
   const data = await getConfirmData();
   if (!data) return;
@@ -225,10 +259,10 @@ btnDownload.addEventListener('click', async () => {
   btnDownload.textContent = 'Preparing\u2026';
   btnDownload.disabled = true;
   try {
-    const result = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING });
-    if (result?.dataUrl) {
+    if (!videoBlobUrl) await loadVideo();
+    if (videoBlobUrl) {
       const a = document.createElement('a');
-      a.href = result.dataUrl;
+      a.href = videoBlobUrl;
       a.download = `bloom-${Date.now()}.mp4`;
       a.click();
     }

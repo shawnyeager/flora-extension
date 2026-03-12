@@ -21,7 +21,6 @@ let controlsState: RecordingControlsState = {
   pausedAccumulated: 0,
 };
 let pauseTimestamp = 0;
-let controlsWindowId: number | null = null;
 
 /** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
 async function findScriptableTab(): Promise<number | null> {
@@ -36,9 +35,16 @@ function setState(state: ExtensionState) {
   currentState = state;
   browser.storage.local.set({ state });
 
-  // Focus the recording tab when entering preview (review overlay shows there)
-  if (state === 'preview' && recordingTabId) {
-    browser.tabs.update(recordingTabId, { active: true }).catch(() => {});
+  // Open review.html tab for preview (or focus it if already open)
+  if (state === 'preview') {
+    const reviewUrl = browser.runtime.getURL('/review.html');
+    browser.tabs.query({ url: reviewUrl }).then((tabs) => {
+      if (tabs.length > 0 && tabs[0].id) {
+        browser.tabs.update(tabs[0].id, { active: true });
+      } else {
+        browser.tabs.create({ url: reviewUrl });
+      }
+    });
   }
 
   // Send to extension pages (popup, offscreen, review)
@@ -65,11 +71,6 @@ function setState(state: ExtensionState) {
     browser.action.setBadgeBackgroundColor({ color: '#e53e3e' });
   } else {
     browser.action.setBadgeText({ text: '' });
-    // Close floating controls window when no longer recording
-    if (controlsWindowId) {
-      browser.windows.remove(controlsWindowId).catch(() => {});
-      controlsWindowId = null;
-    }
   }
 }
 
@@ -262,16 +263,6 @@ export default defineBackground(() => {
           controlsState = { paused: false, micMuted: false, webcamOn: true, recordingStartedAt: Date.now(), pausedAccumulated: 0 };
           pauseTimestamp = 0;
           setState('recording');
-          // Open floating controls window
-          browser.windows.create({
-            url: browser.runtime.getURL('/controls.html'),
-            type: 'popup',
-            width: 320,
-            height: 60,
-            top: 60,
-            left: Math.round(screen.availWidth / 2 - 160),
-            focused: false,
-          }).then((w) => { controlsWindowId = w?.id ?? null; }).catch(() => {});
           return false;
 
         case MessageType.CAPTURE_ERROR: {
@@ -323,11 +314,12 @@ export default defineBackground(() => {
 
         case MessageType.TOGGLE_WEBCAM: {
           controlsState.webcamOn = !!(message as any).enabled;
-          browser.runtime.sendMessage({
-            type: MessageType.TOGGLE_WEBCAM,
-            target: 'offscreen',
-            enabled: (message as any).enabled,
-          }).catch(console.error);
+          if (recordingTabId) {
+            browser.tabs.sendMessage(recordingTabId, {
+              type: MessageType.TOGGLE_WEBCAM,
+              enabled: (message as any).enabled,
+            }).catch(console.error);
+          }
           sendResponse({ ok: true });
           return false;
         }
