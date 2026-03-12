@@ -120,9 +120,6 @@
   right: -2px;
   width: 32px;
   height: 32px;
-  min-width: 44px;
-  min-height: 44px;
-  margin: -6px;
   border-radius: 50%;
   background: rgba(15, 15, 15, 0.9);
   border: 1px solid var(--bl-border-muted);
@@ -134,6 +131,14 @@
   color: var(--bl-text-secondary);
   padding: 0;
   transition: background var(--bl-duration-fast), color var(--bl-duration-fast);
+}
+
+/* Expand tap target to 44px without changing visual size */
+.bloom-webcam-toggle::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
 }
 
 .bloom-webcam-toggle:hover {
@@ -317,6 +322,23 @@
   opacity: 1;
 }
 
+.br-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.br-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.br-panel::-webkit-scrollbar-thumb {
+  background: var(--bl-border-muted);
+  border-radius: 3px;
+}
+
+.br-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--bl-border-hover);
+}
+
 /* Close button */
 .br-close {
   position: absolute;
@@ -442,7 +464,7 @@
   padding: 6px 10px;
   border: 1px solid var(--bl-border-muted);
   border-radius: var(--bl-radius-sm);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bl-bg-base);
   color: var(--bl-text-primary);
   font-size: 13px;
   font-family: var(--bl-font-mono);
@@ -641,7 +663,7 @@
   height: 100%;
   background: var(--bl-blue);
   border-radius: 2px;
-  transition: width 0.3s ease;
+  transition: width 0.3s var(--bl-ease);
 }
 
 .br-progress-detail {

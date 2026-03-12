@@ -16,7 +16,6 @@ async function loadSettings() {
 
 function showIdentityNote() {
   identityEl.textContent = 'Detected from your NIP-07 signer when recording';
-  identityEl.style.color = '#a0aec0';
 }
 
 btnSave.addEventListener('click', async () => {

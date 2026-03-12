@@ -19,6 +19,10 @@
   --bl-green: #4ade80;
   --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --bl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+  --bl-radius-sm: 6px;
+  --bl-radius-md: 10px;
+  --bl-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --bl-duration-fast: 0.15s;
 }
 
 body {
@@ -29,6 +33,7 @@ body {
   display: flex;
   justify-content: center;
   padding: 40px 16px;
+  line-height: 1.5;
 }
 
 .container {
@@ -69,18 +74,20 @@ textarea {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--bl-border-muted);
-  border-radius: 6px;
+  border-radius: var(--bl-radius-sm);
   background: var(--bl-bg-raised);
   color: var(--bl-text-primary);
   font-size: 13px;
   font-family: var(--bl-font-mono);
   resize: vertical;
-  transition: border-color 0.15s;
+  transition: border-color var(--bl-duration-fast) var(--bl-ease),
+              box-shadow var(--bl-duration-fast) var(--bl-ease);
 }
 
 textarea:focus {
   outline: none;
   border-color: var(--bl-blue);
+  box-shadow: 0 0 0 1px var(--bl-blue);
 }
 
 .toggle-label {
@@ -103,7 +110,7 @@ textarea:focus {
   color: var(--bl-text-secondary);
   padding: 8px 10px;
   border: 1px solid var(--bl-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--bl-radius-sm);
   background: var(--bl-bg-raised);
   word-break: break-all;
 }
@@ -117,13 +124,14 @@ textarea:focus {
 .btn-save {
   padding: 10px 24px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--bl-radius-md);
   background: var(--bl-blue);
   color: var(--bl-bg-base);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--bl-duration-fast) var(--bl-ease),
+              transform 0.1s var(--bl-ease);
   font-family: var(--bl-font-sans);
 }
 
@@ -131,9 +139,19 @@ textarea:focus {
   background: var(--bl-blue-hover);
 }
 
+.btn-save:active {
+  transform: scale(0.98);
+}
+
 .btn-save:focus-visible {
   outline: 2px solid var(--bl-blue);
   outline-offset: 2px;
+}
+
+.btn-save:disabled {
+  background: var(--bl-bg-muted);
+  color: var(--bl-text-muted);
+  cursor: not-allowed;
 }
 
 .save-status {

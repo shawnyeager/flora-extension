@@ -1,28 +1,45 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bloom - Grant Permissions</title>
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     body {
-      font-family: system-ui, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      margin: 0;
-      background: #0f0f0f;
-      color: #e8e8e8;
+      background: #111114;
+      color: #f0f0f2;
+      line-height: 1.5;
     }
-    .container { text-align: center; padding: 32px; }
-    .status { font-size: 18px; margin-bottom: 16px; }
-    .sub { font-size: 14px; color: #888; }
+    .container {
+      text-align: center;
+      padding: 32px;
+      max-width: 400px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #9ca3af;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="status" id="status">Requesting camera & microphone access...</div>
-    <div class="sub" id="sub">Please allow access when prompted.</div>
+    <h1 id="status">Requesting camera &amp; microphone access&hellip;</h1>
+    <p id="sub">Please allow access when prompted.</p>
   </div>
   <script src="./main.ts" type="module"></script>
 </body>
