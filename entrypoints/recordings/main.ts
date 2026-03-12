@@ -1,4 +1,5 @@
 import { MessageType, type RecordingMeta } from '@/utils/messages';
+import { getSettings } from '@/utils/settings';
 import { Icons } from '@/utils/icons';
 import type { ExtensionState } from '@/utils/state';
 
@@ -310,10 +311,11 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
     upBtn.disabled = currentState !== 'idle';
     upBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
+      const settings = await getSettings();
       const resp = await browser.runtime.sendMessage({
         type: MessageType.UPLOAD_FROM_LIBRARY,
         hash: rec.hash,
-        publishToNostr: false,
+        publishToNostr: settings.publishToNostr,
       });
       if (!resp?.ok) {
         upBtn.textContent = 'Not now';
