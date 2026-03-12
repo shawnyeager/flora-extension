@@ -20,6 +20,7 @@
   --bl-green: #4ade80;
   --bl-blue: #60a5fa;
   --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --bl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
   --bl-radius-sm: 6px;
   --bl-radius-md: 10px;
   --bl-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -37,12 +38,18 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  gap: 16px;
+  padding: 16px;
+  gap: 12px;
 }
 
 /* Header */
 .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-left {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -58,6 +65,37 @@ body {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+.btn-settings {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--bl-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--bl-duration-fast) var(--bl-ease),
+              color var(--bl-duration-fast) var(--bl-ease);
+}
+
+.btn-settings svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-settings:hover {
+  background: var(--bl-bg-hover);
+  color: var(--bl-text-secondary);
+}
+
+.btn-settings:focus-visible {
+  outline: 2px solid var(--bl-blue);
+  outline-offset: 2px;
 }
 
 /* Status */
@@ -98,6 +136,39 @@ body {
   flex: 1;
 }
 
+/* Destination info */
+.dest-info {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bl-border-subtle);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-bg-raised);
+  overflow: hidden;
+}
+
+.dest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.dest-row + .dest-row {
+  border-top: 1px solid var(--bl-border-subtle);
+}
+
+.dest-label {
+  color: var(--bl-text-muted);
+  font-weight: 500;
+}
+
+.dest-value {
+  color: var(--bl-text-secondary);
+  font-family: var(--bl-font-mono);
+  font-size: 11px;
+}
+
 /* Buttons */
 .btn-record {
   width: 100%;
@@ -110,7 +181,8 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background var(--bl-duration-fast) var(--bl-ease),
-              transform 0.1s var(--bl-ease);
+              transform 0.1s var(--bl-ease),
+              opacity var(--bl-duration-fast) var(--bl-ease);
   font-family: var(--bl-font-sans);
 }
 
@@ -119,6 +191,11 @@ body {
 .btn-record:focus-visible {
   outline: 2px solid var(--bl-red);
   outline-offset: 2px;
+}
+.btn-record:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-stop,
@@ -154,29 +231,9 @@ body {
   outline-offset: 2px;
 }
 
-/* Footer */
-.footer {
-  display: flex;
-  justify-content: center;
-}
-
-.settings-link {
-  font-size: 12px;
-  color: var(--bl-text-muted);
-  text-decoration: none;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: var(--bl-radius-sm);
-  transition: color var(--bl-duration-fast) var(--bl-ease),
-              background var(--bl-duration-fast) var(--bl-ease);
-}
-
-.settings-link:hover {
-  color: var(--bl-text-secondary);
-  background: var(--bl-bg-muted);
-}
-
-.settings-link:focus-visible {
-  outline: 2px solid var(--bl-blue);
-  outline-offset: 2px;
+.btn-stop:disabled,
+.btn-open:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }

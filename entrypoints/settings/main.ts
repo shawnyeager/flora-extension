@@ -1,11 +1,12 @@
 import { getSettings, saveSettings } from '@/utils/settings';
+import { MessageType } from '@/utils/messages';
 
 const serversEl = document.getElementById('servers') as HTMLTextAreaElement;
 const relaysEl = document.getElementById('relays') as HTMLTextAreaElement;
 const publishToggle = document.getElementById('publish-toggle') as HTMLInputElement;
 const identityEl = document.getElementById('identity') as HTMLDivElement;
 const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
-const saveStatus = document.getElementById('save-status') as HTMLDivElement;
+const saveStatus = document.getElementById('save-status') as HTMLSpanElement;
 
 async function loadSettings() {
   const settings = await getSettings();
@@ -14,9 +15,33 @@ async function loadSettings() {
   publishToggle.checked = settings.publishToNostr;
 }
 
-function showIdentityNote() {
-  identityEl.textContent = 'Detected from your NIP-07 signer when recording';
+async function detectIdentity() {
+  identityEl.textContent = 'Checking\u2026';
+  identityEl.classList.add('checking');
+  identityEl.classList.remove('error');
+
+  try {
+    const result = await browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE });
+    identityEl.classList.remove('checking');
+
+    if (result && 'pubkey' in result && result.pubkey) {
+      const hex = result.pubkey as string;
+      identityEl.textContent = hex.length > 16
+        ? `${hex.slice(0, 8)}\u2026${hex.slice(-8)}`
+        : hex;
+      identityEl.title = hex;
+    } else {
+      identityEl.classList.add('error');
+      identityEl.textContent = 'No NIP-07 signer detected. Install a Nostr signer extension.';
+    }
+  } catch {
+    identityEl.classList.remove('checking');
+    identityEl.classList.add('error');
+    identityEl.textContent = 'Detected automatically from your NIP-07 signer when recording.';
+  }
 }
+
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 btnSave.addEventListener('click', async () => {
   const servers = serversEl.value
@@ -28,15 +53,25 @@ btnSave.addEventListener('click', async () => {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  btnSave.disabled = true;
+  btnSave.textContent = 'Saving\u2026';
+
   await saveSettings({
     blossomServers: servers,
     nostrRelays: relays,
     publishToNostr: publishToggle.checked,
   });
 
+  btnSave.disabled = false;
+  btnSave.textContent = 'Save';
+
+  if (saveTimeout) clearTimeout(saveTimeout);
   saveStatus.textContent = 'Saved';
-  setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+  saveStatus.classList.add('visible');
+  saveTimeout = setTimeout(() => {
+    saveStatus.classList.remove('visible');
+  }, 2000);
 });
 
 loadSettings();
-showIdentityNote();
+detectIdentity();

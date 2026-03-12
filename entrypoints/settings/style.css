@@ -7,6 +7,7 @@
 :root {
   --bl-bg-base: #111114;
   --bl-bg-raised: #18181c;
+  --bl-bg-subtle: rgba(255, 255, 255, 0.04);
   --bl-bg-muted: rgba(255, 255, 255, 0.06);
   --bl-bg-hover: rgba(255, 255, 255, 0.1);
   --bl-border-subtle: rgba(255, 255, 255, 0.06);
@@ -23,6 +24,7 @@
   --bl-radius-md: 10px;
   --bl-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --bl-duration-fast: 0.15s;
+  --bl-duration-normal: 0.25s;
 }
 
 body {
@@ -32,7 +34,7 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  padding: 40px 16px;
+  padding: 48px 16px;
   line-height: 1.5;
 }
 
@@ -41,47 +43,84 @@ body {
   max-width: 480px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 16px;
 }
 
-h1 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-h2 {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--bl-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
-section {
+.header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.header-sub {
+  font-size: 13px;
+  color: var(--bl-text-muted);
+  font-weight: 500;
+}
+
+/* Cards */
+.card {
+  padding: 16px;
+  background: var(--bl-bg-raised);
+  border: 1px solid var(--bl-border-subtle);
+  border-radius: var(--bl-radius-md);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+}
+
+.card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bl-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .hint {
   font-size: 12px;
   color: var(--bl-text-muted);
+  line-height: 1.4;
 }
 
+/* Textarea */
 textarea {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--bl-border-muted);
   border-radius: var(--bl-radius-sm);
-  background: var(--bl-bg-raised);
+  background: var(--bl-bg-base);
   color: var(--bl-text-primary);
   font-size: 13px;
   font-family: var(--bl-font-mono);
   resize: vertical;
+  line-height: 1.6;
   transition: border-color var(--bl-duration-fast) var(--bl-ease),
               box-shadow var(--bl-duration-fast) var(--bl-ease);
+}
+
+textarea::placeholder {
+  color: var(--bl-text-muted);
 }
 
 textarea:focus {
@@ -90,39 +129,58 @@ textarea:focus {
   box-shadow: 0 0 0 1px var(--bl-blue);
 }
 
-.toggle-label {
+/* Toggle */
+.toggle-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 14px;
   cursor: pointer;
+  padding: 2px 0;
 }
 
-.toggle-label input[type="checkbox"] {
+.toggle-row input[type="checkbox"] {
   accent-color: var(--bl-blue);
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
 }
 
+/* Identity */
 .identity-display {
   font-size: 13px;
   font-family: var(--bl-font-mono);
   color: var(--bl-text-secondary);
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--bl-border-subtle);
   border-radius: var(--bl-radius-sm);
-  background: var(--bl-bg-raised);
+  background: var(--bl-bg-base);
   word-break: break-all;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
 }
 
+.identity-display.checking {
+  color: var(--bl-text-muted);
+}
+
+.identity-display.error {
+  color: var(--bl-text-muted);
+  font-family: var(--bl-font-sans);
+  font-size: 13px;
+}
+
+/* Actions */
 .actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding-top: 8px;
 }
 
 .btn-save {
-  padding: 10px 24px;
+  padding: 10px 28px;
   border: none;
   border-radius: var(--bl-radius-md);
   background: var(--bl-blue);
@@ -131,7 +189,8 @@ textarea:focus {
   font-weight: 600;
   cursor: pointer;
   transition: background var(--bl-duration-fast) var(--bl-ease),
-              transform 0.1s var(--bl-ease);
+              transform 0.1s var(--bl-ease),
+              opacity var(--bl-duration-fast) var(--bl-ease);
   font-family: var(--bl-font-sans);
 }
 
@@ -152,9 +211,16 @@ textarea:focus {
   background: var(--bl-bg-muted);
   color: var(--bl-text-muted);
   cursor: not-allowed;
+  transform: none;
 }
 
 .save-status {
   font-size: 13px;
   color: var(--bl-green);
+  opacity: 0;
+  transition: opacity var(--bl-duration-normal) var(--bl-ease);
+}
+
+.save-status.visible {
+  opacity: 1;
 }

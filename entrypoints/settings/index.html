@@ -1,42 +1,58 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Bloom - Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom Settings</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div class="container">
-    <h1>Bloom Settings</h1>
+    <header class="header">
+      <img src="/icon/48.png" alt="" class="header-icon">
+      <div>
+        <h1 class="header-title">Bloom</h1>
+        <p class="header-sub">Settings</p>
+      </div>
+    </header>
 
-    <section>
-      <h2>Blossom Servers</h2>
-      <p class="hint">First server is used as default. One URL per line.</p>
-      <textarea id="servers" rows="3" placeholder="https://blossom.band"></textarea>
-    </section>
+    <div class="card">
+      <div class="card-head">
+        <h2>Blossom Servers</h2>
+        <p class="hint">Upload destination. First URL is the default.</p>
+      </div>
+      <textarea id="servers" rows="3" placeholder="https://blossom.band" spellcheck="false" autocomplete="off"></textarea>
+    </div>
 
-    <section>
-      <h2>Nostr Relays</h2>
-      <p class="hint">Relays used when publishing notes. One URL per line.</p>
-      <textarea id="relays" rows="3" placeholder="wss://relay.damus.io"></textarea>
-    </section>
+    <div class="card">
+      <div class="card-head">
+        <h2>Nostr Relays</h2>
+        <p class="hint">Where notes are published. One URL per line.</p>
+      </div>
+      <textarea id="relays" rows="3" placeholder="wss://relay.damus.io" spellcheck="false" autocomplete="off"></textarea>
+    </div>
 
-    <section>
-      <h2>Publishing</h2>
-      <label class="toggle-label">
-        <input type="checkbox" id="publish-toggle" />
-        Publish note to Nostr by default
+    <div class="card">
+      <div class="card-head">
+        <h2>Publishing</h2>
+      </div>
+      <label class="toggle-row">
+        <input type="checkbox" id="publish-toggle">
+        <span>Publish to Nostr by default</span>
       </label>
-    </section>
+    </div>
 
-    <section>
-      <h2>Identity</h2>
-      <div id="identity" class="identity-display">Checking...</div>
-    </section>
+    <div class="card">
+      <div class="card-head">
+        <h2>Identity</h2>
+        <p class="hint">Your Nostr public key, detected via NIP-07 signer extension.</p>
+      </div>
+      <div id="identity" class="identity-display"></div>
+    </div>
 
     <div class="actions">
-      <button id="btn-save" class="btn-save">Save Settings</button>
-      <div id="save-status" class="save-status"></div>
+      <button id="btn-save" class="btn-save">Save</button>
+      <span id="save-status" class="save-status"></span>
     </div>
   </div>
   <script src="./main.ts" type="module"></script>
