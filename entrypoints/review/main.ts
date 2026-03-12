@@ -130,7 +130,7 @@ async function loadVideo() {
       await new Promise<void>((resolve) => {
         previewVideo.onloadedmetadata = () => resolve();
         previewVideo.onerror = () => resolve();
-        previewVideo.src = videoBlobUrl;
+        previewVideo.src = videoBlobUrl!;
       });
       confirmVideo.src = videoBlobUrl;
       videoLoaded = true;

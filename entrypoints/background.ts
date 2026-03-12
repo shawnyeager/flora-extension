@@ -40,10 +40,11 @@ async function findScriptableTab(): Promise<number | null> {
   if (!recordingTabId) {
     try {
       const stored = await browser.storage.local.get('recordingTabId');
-      if (stored.recordingTabId) {
-        const tab = await browser.tabs.get(stored.recordingTabId);
+      const storedId = stored.recordingTabId as number | undefined;
+      if (storedId) {
+        const tab = await browser.tabs.get(storedId);
         if (tab?.url && /^https?:/.test(tab.url)) {
-          recordingTabId = stored.recordingTabId;
+          recordingTabId = storedId;
           return recordingTabId;
         }
       }
@@ -683,7 +684,7 @@ export default defineBackground(() => {
           return false;
         }
 
-        case 'open_settings': {
+        case MessageType.OPEN_SETTINGS: {
           browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
           return false;
         }
