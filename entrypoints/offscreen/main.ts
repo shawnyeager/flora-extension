@@ -1,5 +1,4 @@
 import { MessageType, type Message } from '@/utils/messages';
-import { getSettings } from '@/utils/settings';
 import {
   Output,
   Mp4OutputFormat,
@@ -478,7 +477,7 @@ async function deleteRecordings(hashes: string[]): Promise<number> {
   return deleted;
 }
 
-async function uploadRecordingByHash(hash: string, serverOverride?: string) {
+async function uploadRecordingByHash(hash: string, server: string) {
   try {
     const db = await openDB();
     const tx = db.transaction('recordings', 'readonly');
@@ -495,8 +494,7 @@ async function uploadRecordingByHash(hash: string, serverOverride?: string) {
     db.close();
 
     const blob = new Blob([recording.data], { type: 'video/mp4' });
-    const settings = await getSettings();
-    const primaryServer = serverOverride || settings.blossomServers[0];
+    const primaryServer = server;
     if (!primaryServer) throw new Error('No Blossom server configured');
 
     console.log(`[offscreen] uploading ${blob.size} bytes to ${primaryServer}`);
@@ -557,7 +555,7 @@ async function getPublicKey(): Promise<string> {
 
 // --- Blossom Upload ---
 
-async function uploadRecording(serverOverride?: string) {
+async function uploadRecording(server: string) {
   try {
     const db = await openDB();
     const tx = db.transaction('recordings', 'readonly');
@@ -579,8 +577,7 @@ async function uploadRecording(serverOverride?: string) {
     db.close();
 
     const blob = new Blob([recording.data], { type: 'video/mp4' });
-    const settings = await getSettings();
-    const primaryServer = serverOverride || settings.blossomServers[0];
+    const primaryServer = server;
     if (!primaryServer) throw new Error('No Blossom server configured');
 
     console.log(`[offscreen] uploading ${blob.size} bytes to ${primaryServer}`);
@@ -616,9 +613,8 @@ async function uploadRecording(serverOverride?: string) {
 
 // --- Nostr Publishing ---
 
-async function publishNote(blossomUrl: string, sha256: string, size: number, noteContent?: string) {
+async function publishNote(blossomUrl: string, sha256: string, size: number, relays: string[], noteContent?: string) {
   try {
-    const settings = await getSettings();
     const signer = createSigner();
 
     const text = noteContent?.trim();
@@ -645,7 +641,6 @@ async function publishNote(blossomUrl: string, sha256: string, size: number, not
     console.log('[offscreen] signed note event:', signedEvent.id);
 
     const pool = new SimplePool();
-    const relays = settings.nostrRelays;
 
     const publishPromises = pool.publish(relays, signedEvent);
     // Wait for at least one relay to accept
@@ -727,14 +722,14 @@ browser.runtime.onMessage.addListener(
 
       case MessageType.START_UPLOAD: {
         const msg = message as any;
-        uploadRecording(msg.serverOverride);
+        uploadRecording(msg.server);
         sendResponse({ ok: true });
         return false;
       }
 
       case MessageType.PUBLISH_NOTE: {
         const msg = message as any;
-        publishNote(msg.blossomUrl, msg.sha256, msg.size, msg.noteContent);
+        publishNote(msg.blossomUrl, msg.sha256, msg.size, msg.relays, msg.noteContent);
         sendResponse({ ok: true });
         return false;
       }
@@ -757,7 +752,7 @@ browser.runtime.onMessage.addListener(
 
       case MessageType.UPLOAD_FROM_LIBRARY: {
         const msg = message as any;
-        uploadRecordingByHash(msg.hash, msg.serverOverride);
+        uploadRecordingByHash(msg.hash, msg.server);
         sendResponse({ ok: true });
         return false;
       }

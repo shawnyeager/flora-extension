@@ -392,14 +392,17 @@ export default defineBackground(() => {
 
           if (pendingPublishToNostr) {
             setState('publishing');
-            browser.runtime.sendMessage({
-              type: MessageType.PUBLISH_NOTE,
-              target: 'offscreen',
-              blossomUrl: msg.url,
-              sha256: msg.sha256,
-              size: msg.size,
-              noteContent: pendingNoteContent,
-            }).catch(console.error);
+            getSettings().then((settings) =>
+              browser.runtime.sendMessage({
+                type: MessageType.PUBLISH_NOTE,
+                target: 'offscreen',
+                blossomUrl: msg.url,
+                sha256: msg.sha256,
+                size: msg.size,
+                relays: settings.nostrRelays,
+                noteContent: pendingNoteContent,
+              }),
+            ).catch(console.error);
           } else {
             // Skip Nostr publish — go straight to complete
             setState('complete');
@@ -501,16 +504,16 @@ export default defineBackground(() => {
           pendingPublishToNostr = msg.publishToNostr !== false;
           pendingNoteContent = msg.noteContent;
           setState('uploading');
-          ensureOffscreenDocument()
-            .then(() =>
+          getSettings().then((settings) => {
+            const server = msg.serverOverride || settings.blossomServers[0];
+            return ensureOffscreenDocument().then(() =>
               browser.runtime.sendMessage({
                 type: MessageType.START_UPLOAD,
                 target: 'offscreen',
-                serverOverride: msg.serverOverride,
-                publishToNostr: msg.publishToNostr,
+                server,
               }),
-            )
-            .catch(console.error);
+            );
+          }).catch(console.error);
           sendResponse({ ok: true });
           return false;
         }
@@ -603,16 +606,17 @@ export default defineBackground(() => {
           pendingPublishToNostr = msg.publishToNostr !== false;
           pendingNoteContent = msg.noteContent;
           setState('uploading');
-          ensureOffscreenDocument()
-            .then(() =>
+          getSettings().then((settings) => {
+            const server = msg.serverOverride || settings.blossomServers[0];
+            return ensureOffscreenDocument().then(() =>
               browser.runtime.sendMessage({
                 type: MessageType.UPLOAD_FROM_LIBRARY,
                 target: 'offscreen',
                 hash: msg.hash,
-                serverOverride: msg.serverOverride,
+                server,
               }),
-            )
-            .catch(console.error);
+            );
+          }).catch(console.error);
           sendResponse({ ok: true });
           return false;
         }
