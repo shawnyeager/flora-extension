@@ -5,8 +5,8 @@ export interface BloomSettings {
 }
 
 const DEFAULTS: BloomSettings = {
-  blossomServers: ['https://blossom.band'],
-  nostrRelays: ['wss://relay.damus.io', 'wss://nos.lol'],
+  blossomServers: ['https://blossom.primal.net', 'https://blossom.nostr.build'],
+  nostrRelays: ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.nostr.band'],
   publishToNostr: false,
 };
 
