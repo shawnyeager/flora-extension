@@ -146,9 +146,16 @@ const STATE_LABELS: Record<ExtensionState, string> = {
 const RECORDING_STATES: ExtensionState[] = ['recording'];
 const ACTIVE_STATES: ExtensionState[] = ['initializing', 'awaiting_media', 'countdown', 'finalizing', 'uploading', 'publishing', 'confirming'];
 
-function updateStatus(state: ExtensionState) {
+async function updateStatus(state: ExtensionState) {
   currentState = state;
-  const label = STATE_LABELS[state];
+  let label = STATE_LABELS[state];
+
+  if (state === 'error') {
+    try {
+      const { error } = await browser.runtime.sendMessage({ type: MessageType.GET_ERROR });
+      if (error) label = error;
+    } catch {}
+  }
 
   if (!label) {
     noticeEl.hidden = true;
@@ -157,6 +164,7 @@ function updateStatus(state: ExtensionState) {
     noticeDot.className = 'notice-dot';
     if (RECORDING_STATES.includes(state)) noticeDot.classList.add('recording');
     else if (ACTIVE_STATES.includes(state)) noticeDot.classList.add('active');
+    else if (state === 'error') noticeDot.classList.add('error');
     noticeText.textContent = label;
   }
 }
