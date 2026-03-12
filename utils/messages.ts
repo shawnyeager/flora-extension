@@ -57,6 +57,13 @@ export const MessageType = {
   GET_CONFIRM_DATA: 'get_confirm_data',
   CONFIRM_UPLOAD: 'confirm_upload',
   BACK_TO_PREVIEW: 'back_to_preview',
+
+  // Recording library
+  LIST_RECORDINGS: 'list_recordings',
+  DELETE_RECORDING: 'delete_recording',
+  MARK_UPLOADED: 'mark_uploaded',
+  GET_RECORDING_BY_HASH: 'get_recording_by_hash',
+  UPLOAD_FROM_LIBRARY: 'upload_from_library',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -230,6 +237,44 @@ export interface Nip07ProbeMessage extends BaseMessage {
   tabId?: number;
 }
 
+// Recording library
+export interface RecordingMeta {
+  hash: string;
+  size: number;
+  duration: number;
+  timestamp: number;
+  uploaded: boolean;
+  blossomUrl?: string;
+}
+
+export interface ListRecordingsMessage extends BaseMessage {
+  type: typeof MessageType.LIST_RECORDINGS;
+}
+
+export interface DeleteRecordingMessage extends BaseMessage {
+  type: typeof MessageType.DELETE_RECORDING;
+  hash: string;
+}
+
+export interface MarkUploadedMessage extends BaseMessage {
+  type: typeof MessageType.MARK_UPLOADED;
+  hash: string;
+  blossomUrl: string;
+}
+
+export interface GetRecordingByHashMessage extends BaseMessage {
+  type: typeof MessageType.GET_RECORDING_BY_HASH;
+  hash: string;
+}
+
+export interface UploadFromLibraryMessage extends BaseMessage {
+  type: typeof MessageType.UPLOAD_FROM_LIBRARY;
+  hash: string;
+  serverOverride?: string;
+  publishToNostr: boolean;
+  noteContent?: string;
+}
+
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
@@ -261,4 +306,9 @@ export type Message =
   | GetConfirmDataMessage
   | ConfirmUploadMessage
   | BackToPreviewMessage
-  | Nip07ProbeMessage;
+  | Nip07ProbeMessage
+  | ListRecordingsMessage
+  | DeleteRecordingMessage
+  | MarkUploadedMessage
+  | GetRecordingByHashMessage
+  | UploadFromLibraryMessage;

@@ -307,6 +307,14 @@ export default defineBackground(() => {
           console.log(`[background] upload complete: ${msg.url}`);
           uploadResult = { url: msg.url, sha256: msg.sha256, size: msg.size };
 
+          // Mark recording as uploaded in IDB
+          browser.runtime.sendMessage({
+            type: MessageType.MARK_UPLOADED,
+            target: 'offscreen',
+            hash: msg.sha256,
+            blossomUrl: msg.url,
+          }).catch(() => {});
+
           if (pendingPublishToNostr) {
             setState('publishing');
             browser.runtime.sendMessage({
@@ -420,6 +428,76 @@ export default defineBackground(() => {
 
         case MessageType.BACK_TO_PREVIEW: {
           setState('preview');
+          sendResponse({ ok: true });
+          return false;
+        }
+
+        case MessageType.LIST_RECORDINGS:
+        case MessageType.GET_RECORDING_BY_HASH: {
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                ...message,
+                target: 'offscreen',
+              }),
+            )
+            .then((data) => sendResponse(data))
+            .catch((err) => {
+              console.error(`[background] ${message.type} error:`, err);
+              sendResponse(null);
+            });
+          return true;
+        }
+
+        case MessageType.DELETE_RECORDING: {
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                ...message,
+                target: 'offscreen',
+              }),
+            )
+            .then((data) => sendResponse(data))
+            .catch((err) => {
+              console.error('[background] DELETE_RECORDING error:', err);
+              sendResponse({ ok: false });
+            });
+          return true;
+        }
+
+        case MessageType.MARK_UPLOADED: {
+          if (message.target === 'offscreen') return false; // not for us
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                ...message,
+                target: 'offscreen',
+              }),
+            )
+            .then((data) => sendResponse(data))
+            .catch(() => sendResponse({ ok: false }));
+          return true;
+        }
+
+        case MessageType.UPLOAD_FROM_LIBRARY: {
+          const msg = message as any;
+          if (currentState !== 'idle') {
+            sendResponse({ ok: false, reason: 'busy' });
+            return false;
+          }
+          pendingPublishToNostr = msg.publishToNostr !== false;
+          pendingNoteContent = msg.noteContent;
+          setState('uploading');
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                type: MessageType.UPLOAD_FROM_LIBRARY,
+                target: 'offscreen',
+                hash: msg.hash,
+                serverOverride: msg.serverOverride,
+              }),
+            )
+            .catch(console.error);
           sendResponse({ ok: true });
           return false;
         }

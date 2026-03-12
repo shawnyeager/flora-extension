@@ -237,11 +237,17 @@ async function storeRecording(buffer: ArrayBuffer, duration: number) {
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('bloom-recordings', 1);
-    req.onupgradeneeded = () => {
+    const req = indexedDB.open('bloom-recordings', 2);
+    req.onupgradeneeded = (event) => {
       const db = req.result;
+      let store: IDBObjectStore;
       if (!db.objectStoreNames.contains('recordings')) {
-        db.createObjectStore('recordings', { keyPath: 'hash' });
+        store = db.createObjectStore('recordings', { keyPath: 'hash' });
+      } else {
+        store = (event.target as IDBOpenDBRequest).transaction!.objectStore('recordings');
+      }
+      if (!store.indexNames.contains('by_timestamp')) {
+        store.createIndex('by_timestamp', 'timestamp');
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -278,6 +284,134 @@ async function getLatestRecording(): Promise<{ dataUrl: string; duration: number
       resolve(null);
     };
   });
+}
+
+async function listRecordings(): Promise<{ hash: string; size: number; duration: number; timestamp: number; uploaded: boolean; blossomUrl?: string }[]> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readonly');
+  const store = tx.objectStore('recordings');
+  const index = store.index('by_timestamp');
+
+  return new Promise((resolve) => {
+    const results: any[] = [];
+    const req = index.openCursor(null, 'prev'); // newest first
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (cursor) {
+        const { hash, size, duration, timestamp, uploaded, blossomUrl } = cursor.value;
+        results.push({ hash, size, duration, timestamp, uploaded: !!uploaded, blossomUrl });
+        cursor.continue();
+      } else {
+        db.close();
+        resolve(results);
+      }
+    };
+    req.onerror = () => { db.close(); resolve([]); };
+  });
+}
+
+async function deleteRecording(hash: string): Promise<boolean> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readwrite');
+  const store = tx.objectStore('recordings');
+  return new Promise((resolve) => {
+    const req = store.delete(hash);
+    req.onsuccess = () => { db.close(); resolve(true); };
+    req.onerror = () => { db.close(); resolve(false); };
+  });
+}
+
+async function markUploaded(hash: string, blossomUrl: string): Promise<boolean> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readwrite');
+  const store = tx.objectStore('recordings');
+  return new Promise((resolve) => {
+    const getReq = store.get(hash);
+    getReq.onsuccess = () => {
+      if (!getReq.result) { db.close(); resolve(false); return; }
+      const record = getReq.result;
+      record.uploaded = true;
+      record.blossomUrl = blossomUrl;
+      const putReq = store.put(record);
+      putReq.onsuccess = () => { db.close(); resolve(true); };
+      putReq.onerror = () => { db.close(); resolve(false); };
+    };
+    getReq.onerror = () => { db.close(); resolve(false); };
+  });
+}
+
+async function getRecordingByHash(hash: string): Promise<{ dataUrl: string; duration: number } | null> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readonly');
+  const store = tx.objectStore('recordings');
+  return new Promise((resolve) => {
+    const req = store.get(hash);
+    req.onsuccess = () => {
+      db.close();
+      if (!req.result) { resolve(null); return; }
+      const record = req.result;
+      const bytes = new Uint8Array(record.data);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const dataUrl = 'data:video/mp4;base64,' + btoa(binary);
+      resolve({ dataUrl, duration: record.duration });
+    };
+    req.onerror = () => { db.close(); resolve(null); };
+  });
+}
+
+async function uploadRecordingByHash(hash: string, serverOverride?: string) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+
+    const recording = await new Promise<any>((resolve, reject) => {
+      const req = store.get(hash);
+      req.onsuccess = () => {
+        if (!req.result) { reject(new Error('Recording not found')); return; }
+        resolve(req.result);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+
+    const blob = new Blob([recording.data], { type: 'video/mp4' });
+    const settings = await getSettings();
+    const primaryServer = serverOverride || settings.blossomServers[0];
+    if (!primaryServer) throw new Error('No Blossom server configured');
+
+    console.log(`[offscreen] uploading ${blob.size} bytes to ${primaryServer}`);
+
+    const signer = createSigner();
+    const client = new BlossomClient(primaryServer, signer);
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_PROGRESS,
+      bytesUploaded: 0,
+      totalBytes: blob.size,
+      serverName: primaryServer,
+    });
+
+    const descriptor = await client.uploadBlob(blob, { auth: true });
+
+    console.log(`[offscreen] upload complete:`, descriptor);
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_COMPLETE,
+      url: descriptor.url,
+      sha256: descriptor.sha256,
+      size: descriptor.size,
+    });
+  } catch (err) {
+    console.error('[offscreen] upload error:', err);
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_ERROR,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 // --- NIP-07 Signer (routes through background -> scripting.executeScript in recording tab) ---
@@ -485,6 +619,29 @@ browser.runtime.onMessage.addListener(
       case MessageType.PUBLISH_NOTE: {
         const msg = message as any;
         publishNote(msg.blossomUrl, msg.sha256, msg.size, msg.noteContent);
+        sendResponse({ ok: true });
+        return false;
+      }
+
+      case MessageType.LIST_RECORDINGS:
+        listRecordings().then(sendResponse);
+        return true;
+
+      case MessageType.DELETE_RECORDING:
+        deleteRecording((message as any).hash).then((ok) => sendResponse({ ok }));
+        return true;
+
+      case MessageType.MARK_UPLOADED:
+        markUploaded((message as any).hash, (message as any).blossomUrl).then((ok) => sendResponse({ ok }));
+        return true;
+
+      case MessageType.GET_RECORDING_BY_HASH:
+        getRecordingByHash((message as any).hash).then(sendResponse);
+        return true;
+
+      case MessageType.UPLOAD_FROM_LIBRARY: {
+        const msg = message as any;
+        uploadRecordingByHash(msg.hash, msg.serverOverride);
         sendResponse({ ok: true });
         return false;
       }
