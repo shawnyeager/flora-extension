@@ -1,5 +1,5 @@
 import { MessageType } from '@/utils/messages';
-import type { ExtensionState } from '@/utils/state';
+import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
 
 // --- Element refs ---
 const settingsLink = document.getElementById('settings-link') as HTMLAnchorElement;
@@ -49,6 +49,16 @@ const btnErrorDiscard = document.getElementById('btn-error-discard') as HTMLButt
 
 let confirmLocked = false;
 let videoLoaded = false;
+
+// Warn user before closing tab during protected states
+const beforeUnloadHandler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+function updateBeforeUnload(state: ExtensionState) {
+  if (PROTECTED_STATES.includes(state)) {
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+  } else {
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }
+}
 
 // --- Helpers ---
 
@@ -290,6 +300,7 @@ browser.runtime.onMessage.addListener((message) => {
 });
 
 async function updateUI(state: ExtensionState) {
+  updateBeforeUnload(state);
   switch (state) {
     case 'preview':
       await showPreview();

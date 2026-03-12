@@ -1,7 +1,7 @@
 import './style.css';
 import { MessageType } from '@/utils/messages';
 import { Icons } from '@/utils/icons';
-import type { ExtensionState } from '@/utils/state';
+import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -19,6 +19,7 @@ export default defineContentScript({
     let webcamAcquiring = false;
     let videoLoaded = false;
     let confirmLocked = false;
+    let currentOverlayState: ExtensionState = 'idle';
 
     // Pause
     let paused = false;
@@ -258,6 +259,16 @@ export default defineContentScript({
 
     ui.mount();
 
+    // Override WXT's default overlay host positioning (position:relative in page flow)
+    // to position:fixed so it never scrolls. Prevents compositor lag that causes the
+    // webcam bubble to jitter during scroll in screen capture output.
+    const host = ui.shadow.host as HTMLElement;
+    host.style.position = 'fixed';
+    host.style.inset = '0';
+    host.style.width = '100vw';
+    host.style.height = '100vh';
+    host.style.pointerEvents = 'none';
+
     // ==========================================
     // Recording Functions
     // ==========================================
@@ -301,11 +312,7 @@ export default defineContentScript({
         offEl.style.display = 'none';
         webcamOn = true;
 
-        // Show bubble with fade-in (prevents jarring pop in recording)
-        bubble.classList.remove('entering');
         bubble.style.display = 'block';
-        void bubble.offsetWidth;
-        bubble.classList.add('entering');
       } catch {
         webcamAcquiring = false;
         if (webcamAborted) return;
@@ -326,7 +333,7 @@ export default defineContentScript({
       const controls = ui.shadow.querySelector('.bloom-controls') as HTMLElement;
       const bubble = ui.shadow.querySelector('.bloom-webcam') as HTMLElement;
       if (controls) controls.style.display = 'none';
-      if (bubble) { bubble.style.display = 'none'; bubble.classList.remove('entering'); }
+      if (bubble) bubble.style.display = 'none';
       stopTimer();
       paused = false;
       pausedAccumulator = 0;
@@ -449,26 +456,22 @@ export default defineContentScript({
       panel.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         e.stopPropagation();
-        const confirmView = q('.br-confirm');
-        if (confirmView && confirmView.style.display !== 'none') {
-          browser.runtime.sendMessage({ type: MessageType.BACK_TO_PREVIEW });
-        } else {
-          const previewView = q('.br-preview');
-          if (previewView && previewView.style.display !== 'none') {
-            browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
-          }
+        if (PROTECTED_STATES.includes(currentOverlayState)) return;
+        if (currentOverlayState === 'complete' || currentOverlayState === 'error' || currentOverlayState === 'preview') {
+          browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
         }
       });
 
       // Close button
       q('.br-close').addEventListener('click', () => {
+        if (PROTECTED_STATES.includes(currentOverlayState)) return;
         browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
       });
 
-      // Backdrop click to close (only on preview)
+      // Backdrop click to close (only when not in a protected state)
       q('.br-backdrop').addEventListener('click', () => {
-        const previewView = q('.br-preview');
-        if (previewView && previewView.style.display !== 'none') {
+        if (PROTECTED_STATES.includes(currentOverlayState)) return;
+        if (currentOverlayState === 'preview' || currentOverlayState === 'complete') {
           browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
         }
       });
@@ -716,6 +719,7 @@ export default defineContentScript({
     // State Handler
     // ==========================================
     function updateUI(state: ExtensionState) {
+      currentOverlayState = state;
       if (state === 'awaiting_media') {
         hideReview();
         startWebcamPreview();

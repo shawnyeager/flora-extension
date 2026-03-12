@@ -1,5 +1,5 @@
 import { MessageType, type Message } from '@/utils/messages';
-import { type ExtensionState } from '@/utils/state';
+import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
 import { getSettings } from '@/utils/settings';
 
 const OFFSCREEN_PATH = '/offscreen.html';
@@ -145,13 +145,20 @@ export default defineBackground(() => {
           sendResponse(currentState);
           return false;
 
-        case MessageType.RESET_STATE:
+        case MessageType.RESET_STATE: {
+          // Reject reset during active upload/publish/finalization to prevent data loss
+          const hardProtected: ExtensionState[] = ['finalizing', 'uploading', 'publishing'];
+          if (hardProtected.includes(currentState)) {
+            sendResponse({ ok: false, reason: 'protected_state' });
+            return false;
+          }
           setState('idle');
           uploadResult = null;
           publishResult = null;
           closeOffscreenDocument().catch(console.error);
           sendResponse({ ok: true });
           return false;
+        }
 
         case MessageType.GET_RESULT:
           sendResponse({ uploadResult, publishResult });

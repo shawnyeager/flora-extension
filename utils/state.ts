@@ -55,3 +55,6 @@ export const TRANSITIONS: Record<ExtensionState, ExtensionState[]> = {
 export function canTransition(from: ExtensionState, to: ExtensionState): boolean {
   return TRANSITIONS[from].includes(to);
 }
+
+/** States where the user should not be able to dismiss/reset the UI */
+export const PROTECTED_STATES: ExtensionState[] = ['finalizing', 'confirming', 'uploading', 'publishing'];
