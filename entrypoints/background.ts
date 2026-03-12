@@ -7,6 +7,7 @@ const OFFSCREEN_PATH = '/offscreen.html';
 let currentState: ExtensionState = 'idle';
 let uploadResult: { url: string; sha256: string; size: number } | null = null;
 let publishResult: { noteId: string; blossomUrl: string } | null = null;
+let lastError: string | null = null;
 let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let pendingNoteContent: string | undefined;
@@ -172,6 +173,7 @@ export default defineBackground(() => {
           setState('idle');
           uploadResult = null;
           publishResult = null;
+          lastError = null;
           closeOffscreenDocument().catch(console.error);
           sendResponse({ ok: true });
           return false;
@@ -179,6 +181,10 @@ export default defineBackground(() => {
 
         case MessageType.GET_RESULT:
           sendResponse({ uploadResult, publishResult });
+          return false;
+
+        case MessageType.GET_ERROR:
+          sendResponse({ error: lastError });
           return false;
 
         case MessageType.GET_RECORDING_STATE:
@@ -402,7 +408,9 @@ export default defineBackground(() => {
         }
 
         case MessageType.UPLOAD_ERROR: {
-          console.error('[background] upload error:', (message as any).error);
+          const errMsg = (message as any).error || 'Upload failed';
+          console.error('[background] upload error:', errMsg);
+          lastError = errMsg;
           setState('error');
           return false;
         }
@@ -416,12 +424,14 @@ export default defineBackground(() => {
         }
 
         case MessageType.PUBLISH_ERROR: {
-          console.error('[background] publish error:', (message as any).error);
+          const errMsg = (message as any).error || 'Publishing failed';
+          console.error('[background] publish error:', errMsg);
           // Publishing failed but upload succeeded — still go to complete
           if (uploadResult) {
             publishResult = { noteId: '', blossomUrl: uploadResult.url };
             setState('complete');
           } else {
+            lastError = errMsg;
             setState('error');
           }
           return false;

@@ -283,7 +283,7 @@ const STATE_LABELS: Record<ExtensionState, string> = {
   uploading: 'Uploading\u2026',
   publishing: 'Publishing\u2026',
   complete: 'Shared',
-  error: 'Something went wrong',
+  error: 'Upload failed',
 };
 
 const RECORDING_STATES: ExtensionState[] = ['recording'];

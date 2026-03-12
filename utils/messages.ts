@@ -49,6 +49,7 @@ export const MessageType = {
 
   // Result retrieval
   GET_RESULT: 'get_result',
+  GET_ERROR: 'get_error',
 
   // NIP-07 direct probe (via scripting.executeScript, no postMessage)
   NIP07_PROBE: 'nip07_probe',
@@ -222,6 +223,10 @@ export interface GetResultMessage extends BaseMessage {
   type: typeof MessageType.GET_RESULT;
 }
 
+export interface GetErrorMessage extends BaseMessage {
+  type: typeof MessageType.GET_ERROR;
+}
+
 export interface GetConfirmDataMessage extends BaseMessage {
   type: typeof MessageType.GET_CONFIRM_DATA;
 }
@@ -331,6 +336,7 @@ export type Message =
   | Nip07SignMessage
   | Nip07GetPubkeyMessage
   | GetResultMessage
+  | GetErrorMessage
   | GetConfirmDataMessage
   | ConfirmUploadMessage
   | BackToPreviewMessage

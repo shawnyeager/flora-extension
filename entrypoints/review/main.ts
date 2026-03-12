@@ -370,10 +370,12 @@ async function updateUI(state: ExtensionState) {
       }
       break;
     }
-    case 'error':
+    case 'error': {
       showView(viewError);
-      errorMessage.textContent = 'The upload failed. You can retry or discard the recording.';
+      const { error } = await browser.runtime.sendMessage({ type: MessageType.GET_ERROR });
+      errorMessage.textContent = error || 'The upload failed.';
       break;
+    }
     case 'idle':
       window.close();
       break;
