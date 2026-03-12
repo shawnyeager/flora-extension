@@ -1,7 +1,7 @@
 {
   "name": "bloom",
   "version": "0.1.0",
-  "description": "Record your screen, share instantly. Your recordings, your servers.",
+  "description": "Record your screen, share instantly. Stored on Blossom, shared over Nostr.",
   "private": true,
   "type": "module",
   "scripts": {
