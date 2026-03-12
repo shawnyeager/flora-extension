@@ -67,6 +67,12 @@ body {
   letter-spacing: -0.01em;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .btn-settings {
   width: 32px;
   height: 32px;

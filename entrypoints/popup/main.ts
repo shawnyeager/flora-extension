@@ -25,6 +25,15 @@ headerIcon.alt = '';
 const headerTitle = el('span', 'header-title', 'Bloom');
 headerLeft.append(headerIcon, headerTitle);
 
+const headerActions = el('div', 'header-actions');
+
+const recordingsBtn = el('button', 'btn-settings');
+recordingsBtn.innerHTML = Icons.list;
+recordingsBtn.setAttribute('aria-label', 'Recordings');
+recordingsBtn.addEventListener('click', () => {
+  browser.tabs.create({ url: browser.runtime.getURL('/recordings.html') });
+});
+
 const settingsBtn = el('button', 'btn-settings');
 settingsBtn.innerHTML = Icons.settings;
 settingsBtn.setAttribute('aria-label', 'Settings');
@@ -32,7 +41,8 @@ settingsBtn.addEventListener('click', () => {
   browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
 });
 
-header.append(headerLeft, settingsBtn);
+headerActions.append(recordingsBtn, settingsBtn);
+header.append(headerLeft, headerActions);
 
 // --- Status ---
 const statusBar = el('div', 'status-bar');
