@@ -3,7 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   manifest: {
     name: 'Bloom',
-    description: 'Decentralized screen recording powered by Nostr + Blossom',
+    description: 'Record your screen, share instantly. Your recordings, your servers.',
     version: '0.1.0',
     permissions: [
       'offscreen',
