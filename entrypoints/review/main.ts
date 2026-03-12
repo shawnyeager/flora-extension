@@ -245,7 +245,9 @@ function renderSignerStatus(
     warningEl.append(retryBtn);
 
     warningEl.style.display = 'block';
-    actionBtn.disabled = true;
+    // Only block the button if Nostr publishing requires a signer
+    // Blossom upload works without one
+    actionBtn.disabled = data.publishToNostr;
   }
 }
 
