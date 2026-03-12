@@ -295,3 +295,93 @@ body {
   cursor: not-allowed;
   transform: none;
 }
+
+/* Recording controls toolbar */
+.rec-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bl-bg-muted);
+  border-radius: var(--bl-radius-md);
+  border: 1px solid var(--bl-border-subtle);
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bl-pink);
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.rec-dot.paused {
+  background: var(--bl-amber);
+  animation: none;
+}
+
+.rec-timer {
+  font-family: var(--bl-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bl-text-primary);
+  min-width: 42px;
+}
+
+.rec-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--bl-border-subtle);
+  margin: 0 2px;
+}
+
+.rec-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--bl-radius-sm);
+  background: transparent;
+  color: var(--bl-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--bl-duration-fast) var(--bl-ease),
+              color var(--bl-duration-fast) var(--bl-ease);
+}
+
+.rec-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rec-btn:hover {
+  background: var(--bl-bg-hover);
+  color: var(--bl-text-primary);
+}
+
+.rec-btn:focus-visible {
+  outline: 2px solid var(--bl-violet);
+  outline-offset: 1px;
+}
+
+.rec-btn.active {
+  color: var(--bl-amber);
+}
+
+.rec-btn-stop {
+  margin-left: auto;
+  color: var(--bl-pink);
+}
+
+.rec-btn-stop:hover {
+  background: rgba(201, 107, 156, 0.15);
+  color: var(--bl-pink);
+}
+
+.rec-btn-stop:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

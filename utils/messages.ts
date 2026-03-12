@@ -66,6 +66,9 @@ export const MessageType = {
   UPLOAD_FROM_LIBRARY: 'upload_from_library',
   GENERATE_THUMBNAIL: 'generate_thumbnail',
   DELETE_RECORDINGS: 'delete_recordings',
+
+  // Recording controls state (popup <-> background)
+  GET_RECORDING_STATE: 'get_recording_state',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -288,6 +291,18 @@ export interface DeleteRecordingsMessage extends BaseMessage {
   hashes: string[];
 }
 
+export interface GetRecordingStateMessage extends BaseMessage {
+  type: typeof MessageType.GET_RECORDING_STATE;
+}
+
+export interface RecordingControlsState {
+  paused: boolean;
+  micMuted: boolean;
+  webcamOn: boolean;
+  recordingStartedAt: number; // Date.now() when recording began
+  pausedAccumulated: number;  // ms spent paused so far
+}
+
 export type Message =
   | StartRecordingMessage
   | StopRecordingMessage
@@ -326,4 +341,5 @@ export type Message =
   | GetRecordingByHashMessage
   | UploadFromLibraryMessage
   | GenerateThumbnailMessage
-  | DeleteRecordingsMessage;
+  | DeleteRecordingsMessage
+  | GetRecordingStateMessage;

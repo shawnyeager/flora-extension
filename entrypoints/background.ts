@@ -1,4 +1,4 @@
-import { MessageType, type Message } from '@/utils/messages';
+import { MessageType, type Message, type RecordingControlsState } from '@/utils/messages';
 import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
 import { getSettings } from '@/utils/settings';
 
@@ -11,6 +11,16 @@ let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let pendingNoteContent: string | undefined;
 let recordingTabId: number | null = null;
+
+// Recording controls state (shared between popup and content script)
+let controlsState: RecordingControlsState = {
+  paused: false,
+  micMuted: false,
+  webcamOn: true,
+  recordingStartedAt: 0,
+  pausedAccumulated: 0,
+};
+let pauseTimestamp = 0;
 
 /** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
 async function findScriptableTab(): Promise<number | null> {
@@ -164,11 +174,33 @@ export default defineBackground(() => {
           sendResponse({ uploadResult, publishResult });
           return false;
 
+        case MessageType.GET_RECORDING_STATE:
+          sendResponse({
+            ...controlsState,
+            // If currently paused, include the live pause duration
+            pausedAccumulated: controlsState.pausedAccumulated + (pauseTimestamp ? Date.now() - pauseTimestamp : 0),
+          });
+          return false;
+
         case MessageType.NIP07_PROBE: {
           findScriptableTab()
-            .then((tabId) => {
+            .then(async (tabId) => {
               if (!tabId) return sendResponse({ error: 'No web tab available for NIP-07 probe' });
-              return probeNip07Direct(tabId).then((r) => sendResponse(r));
+              try {
+                const results = await (browser as any).scripting.executeScript({
+                  target: { tabId },
+                  world: 'MAIN',
+                  func: () => {
+                    const nostr = (window as any).nostr;
+                    if (!nostr) return { error: 'missing' };
+                    if (typeof nostr.getPublicKey !== 'function') return { error: 'no getPublicKey' };
+                    return { detected: true };
+                  },
+                });
+                sendResponse(results?.[0]?.result || { error: 'no result' });
+              } catch (err: any) {
+                sendResponse({ error: err.message });
+              }
             })
             .catch((err) => sendResponse({ error: err.message }));
           return true;
@@ -213,6 +245,8 @@ export default defineBackground(() => {
 
         case MessageType.CAPTURE_READY:
           console.log('[background] capture ready, codec:', (message as any).codec);
+          controlsState = { paused: false, micMuted: false, webcamOn: true, recordingStartedAt: Date.now(), pausedAccumulated: 0 };
+          pauseTimestamp = 0;
           setState('recording');
           return false;
 
@@ -230,6 +264,8 @@ export default defineBackground(() => {
         }
 
         case MessageType.PAUSE_RECORDING: {
+          controlsState.paused = true;
+          pauseTimestamp = Date.now();
           browser.runtime.sendMessage({
             type: MessageType.PAUSE_CAPTURE,
             target: 'offscreen',
@@ -239,6 +275,9 @@ export default defineBackground(() => {
         }
 
         case MessageType.RESUME_RECORDING: {
+          if (pauseTimestamp) controlsState.pausedAccumulated += Date.now() - pauseTimestamp;
+          controlsState.paused = false;
+          pauseTimestamp = 0;
           browser.runtime.sendMessage({
             type: MessageType.RESUME_CAPTURE,
             target: 'offscreen',
@@ -248,6 +287,7 @@ export default defineBackground(() => {
         }
 
         case MessageType.TOGGLE_MIC: {
+          controlsState.micMuted = !!(message as any).muted;
           browser.runtime.sendMessage({
             type: MessageType.TOGGLE_MIC,
             target: 'offscreen',
@@ -258,6 +298,7 @@ export default defineBackground(() => {
         }
 
         case MessageType.TOGGLE_WEBCAM: {
+          controlsState.webcamOn = !!(message as any).enabled;
           browser.runtime.sendMessage({
             type: MessageType.TOGGLE_WEBCAM,
             target: 'offscreen',

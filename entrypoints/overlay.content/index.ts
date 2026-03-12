@@ -725,8 +725,9 @@ export default defineContentScript({
         startWebcamPreview();
       } else if (state === 'recording') {
         hideReview();
+        // Hide controls — they appear in the captured video. Popup has controls instead.
         const controls = ui.shadow.querySelector('.bloom-controls') as HTMLElement;
-        if (controls) controls.style.display = 'flex';
+        if (controls) controls.style.display = 'none';
         startTimer();
         if (!webcamStream) startWebcamPreview();
       } else if (state === 'preview') {

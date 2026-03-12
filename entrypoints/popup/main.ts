@@ -86,6 +86,128 @@ async function loadDestination() {
   );
 }
 
+// --- Recording controls toolbar (visible during recording) ---
+const recToolbar = el('div', 'rec-toolbar');
+recToolbar.style.display = 'none';
+
+const recDot = el('div', 'rec-dot');
+const recTimer = el('span', 'rec-timer', '00:00');
+const recDivider = el('div', 'rec-divider');
+
+const recPauseBtn = el('button', 'rec-btn');
+recPauseBtn.innerHTML = Icons.pause;
+recPauseBtn.setAttribute('aria-label', 'Pause recording');
+
+const recMicBtn = el('button', 'rec-btn');
+recMicBtn.innerHTML = Icons.mic;
+recMicBtn.setAttribute('aria-label', 'Mute microphone');
+
+const recCamBtn = el('button', 'rec-btn');
+recCamBtn.innerHTML = Icons.camera;
+recCamBtn.setAttribute('aria-label', 'Turn camera off');
+
+const recStopBtn = el('button', 'rec-btn rec-btn-stop');
+recStopBtn.innerHTML = Icons.stop;
+recStopBtn.setAttribute('aria-label', 'Stop recording');
+
+recToolbar.append(recDot, recTimer, recDivider, recPauseBtn, recMicBtn, recCamBtn, recStopBtn);
+
+// Recording controls state
+let recPaused = false;
+let recMicMuted = false;
+let recWebcamOn = true;
+let timerInterval: ReturnType<typeof setInterval> | null = null;
+let timerStartedAt = 0;
+let timerPausedAccum = 0;
+
+function formatTime(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+  const s = (totalSec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function startTimerTick() {
+  stopTimerTick();
+  timerInterval = setInterval(() => {
+    if (recPaused || !timerStartedAt) return;
+    const elapsed = Date.now() - timerStartedAt - timerPausedAccum;
+    recTimer.textContent = formatTime(elapsed);
+  }, 500);
+}
+
+function stopTimerTick() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+recPauseBtn.addEventListener('click', () => {
+  recPaused = !recPaused;
+  if (recPaused) {
+    recPauseBtn.innerHTML = Icons.play;
+    recPauseBtn.setAttribute('aria-label', 'Resume recording');
+    recPauseBtn.classList.add('active');
+    recDot.classList.add('paused');
+    browser.runtime.sendMessage({ type: MessageType.PAUSE_RECORDING });
+  } else {
+    recPauseBtn.innerHTML = Icons.pause;
+    recPauseBtn.setAttribute('aria-label', 'Pause recording');
+    recPauseBtn.classList.remove('active');
+    recDot.classList.remove('paused');
+    browser.runtime.sendMessage({ type: MessageType.RESUME_RECORDING });
+  }
+});
+
+recMicBtn.addEventListener('click', () => {
+  recMicMuted = !recMicMuted;
+  recMicBtn.innerHTML = recMicMuted ? Icons.micOff : Icons.mic;
+  recMicBtn.classList.toggle('active', recMicMuted);
+  recMicBtn.setAttribute('aria-label', recMicMuted ? 'Unmute microphone' : 'Mute microphone');
+  browser.runtime.sendMessage({ type: MessageType.TOGGLE_MIC, muted: recMicMuted });
+});
+
+recCamBtn.addEventListener('click', () => {
+  recWebcamOn = !recWebcamOn;
+  recCamBtn.innerHTML = recWebcamOn ? Icons.camera : Icons.cameraOff;
+  recCamBtn.classList.toggle('active', !recWebcamOn);
+  recCamBtn.setAttribute('aria-label', recWebcamOn ? 'Turn camera off' : 'Turn camera on');
+  browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: recWebcamOn });
+});
+
+recStopBtn.addEventListener('click', async () => {
+  recStopBtn.disabled = true;
+  await browser.runtime.sendMessage({ type: MessageType.STOP_RECORDING });
+});
+
+async function syncRecordingState() {
+  try {
+    const state = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING_STATE }) as any;
+    if (!state || !state.recordingStartedAt) return;
+
+    timerStartedAt = state.recordingStartedAt;
+    timerPausedAccum = state.pausedAccumulated || 0;
+    recPaused = state.paused;
+    recMicMuted = state.micMuted;
+    recWebcamOn = state.webcamOn;
+
+    // Update UI to match
+    recPauseBtn.innerHTML = recPaused ? Icons.play : Icons.pause;
+    recPauseBtn.setAttribute('aria-label', recPaused ? 'Resume recording' : 'Pause recording');
+    recPauseBtn.classList.toggle('active', recPaused);
+    recDot.classList.toggle('paused', recPaused);
+
+    recMicBtn.innerHTML = recMicMuted ? Icons.micOff : Icons.mic;
+    recMicBtn.classList.toggle('active', recMicMuted);
+
+    recCamBtn.innerHTML = recWebcamOn ? Icons.camera : Icons.cameraOff;
+    recCamBtn.classList.toggle('active', !recWebcamOn);
+
+    // Start timer from current position
+    const elapsed = Date.now() - timerStartedAt - timerPausedAccum;
+    recTimer.textContent = formatTime(elapsed);
+    startTimerTick();
+  } catch { /* background not ready */ }
+}
+
 // --- Buttons ---
 const RECORD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5"/></svg>';
 
@@ -96,7 +218,7 @@ btnStop.style.display = 'none';
 const btnOpen = el('button', 'btn-open', 'Open Review');
 btnOpen.style.display = 'none';
 
-app.append(header, statusBar, destToggle, destBody, btnRecord, btnStop, btnOpen);
+app.append(header, statusBar, destToggle, destBody, recToolbar, btnRecord, btnStop, btnOpen);
 
 loadDestination();
 
@@ -174,6 +296,8 @@ function updateUI(state: ExtensionState) {
   statusDot.classList.toggle('active', ACTIVE_STATES.includes(state));
 
   const isIdle = state === 'idle';
+  const isRecording = state === 'recording';
+
   destToggle.style.display = isIdle ? '' : 'none';
   destBody.style.display = isIdle ? '' : 'none';
 
@@ -181,9 +305,15 @@ function updateUI(state: ExtensionState) {
   btnRecord.disabled = false;
   btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
 
-  btnStop.style.display = state === 'recording' ? 'block' : 'none';
-  btnStop.disabled = false;
-  btnStop.textContent = 'Stop Recording';
+  // Recording toolbar replaces the old stop button
+  recToolbar.style.display = isRecording ? 'flex' : 'none';
+  btnStop.style.display = 'none'; // replaced by toolbar stop button
+
+  if (isRecording) {
+    syncRecordingState();
+  } else {
+    stopTimerTick();
+  }
 
   btnOpen.style.display = POST_STATES.includes(state) ? 'block' : 'none';
 }
