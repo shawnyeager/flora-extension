@@ -189,7 +189,7 @@ body {
   opacity: 0.9;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
   transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-  margin-left: 2px; /* optical centering — triangle sits left-heavy */
+  margin-left: 1px; /* optical centering — play triangles are left-heavy */
 }
 
 /* Subtle at rest so users know it's playable */
