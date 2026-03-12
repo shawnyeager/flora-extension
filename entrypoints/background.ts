@@ -21,6 +21,7 @@ let controlsState: RecordingControlsState = {
   pausedAccumulated: 0,
 };
 let pauseTimestamp = 0;
+let controlsWindowId: number | null = null;
 
 /** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
 async function findScriptableTab(): Promise<number | null> {
@@ -64,6 +65,11 @@ function setState(state: ExtensionState) {
     browser.action.setBadgeBackgroundColor({ color: '#e53e3e' });
   } else {
     browser.action.setBadgeText({ text: '' });
+    // Close floating controls window when no longer recording
+    if (controlsWindowId) {
+      browser.windows.remove(controlsWindowId).catch(() => {});
+      controlsWindowId = null;
+    }
   }
 }
 
@@ -183,9 +189,17 @@ export default defineBackground(() => {
           return false;
 
         case MessageType.NIP07_PROBE: {
+          // Content scripts on web tabs can do the full probe (user is focused there).
+          // Extension pages (settings) can only do a light check (getPublicKey hangs on background tabs).
+          const senderIsWebTab = _sender.tab?.url && /^https?:/.test(_sender.tab.url);
+
           findScriptableTab()
             .then(async (tabId) => {
               if (!tabId) return sendResponse({ error: 'No web tab available for NIP-07 probe' });
+              if (senderIsWebTab) {
+                return probeNip07Direct(tabId).then((r) => sendResponse(r));
+              }
+              // Light probe — just check window.nostr exists
               try {
                 const results = await (browser as any).scripting.executeScript({
                   target: { tabId },
@@ -248,6 +262,16 @@ export default defineBackground(() => {
           controlsState = { paused: false, micMuted: false, webcamOn: true, recordingStartedAt: Date.now(), pausedAccumulated: 0 };
           pauseTimestamp = 0;
           setState('recording');
+          // Open floating controls window
+          browser.windows.create({
+            url: browser.runtime.getURL('/controls.html'),
+            type: 'popup',
+            width: 320,
+            height: 60,
+            top: 60,
+            left: Math.round(screen.availWidth / 2 - 160),
+            focused: false,
+          }).then((w) => { controlsWindowId = w?.id ?? null; }).catch(() => {});
           return false;
 
         case MessageType.CAPTURE_ERROR: {

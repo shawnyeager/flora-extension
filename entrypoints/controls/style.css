@@ -1,0 +1,92 @@
+@import '../../utils/tokens.css';
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bl-bg-base);
+  font-family: var(--bl-font-sans);
+  overflow: hidden;
+  -webkit-app-region: drag; /* Allow dragging the window */
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  height: 44px;
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bl-pink);
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.rec-dot.paused {
+  background: var(--bl-amber);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.timer {
+  font-family: var(--bl-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bl-text-primary);
+  min-width: 42px;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background: var(--bl-border-subtle);
+}
+
+.btn {
+  -webkit-app-region: no-drag;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--bl-radius-sm);
+  background: transparent;
+  color: var(--bl-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--bl-duration-fast) var(--bl-ease),
+              color var(--bl-duration-fast) var(--bl-ease);
+}
+
+.btn svg { width: 15px; height: 15px; }
+
+.btn:hover {
+  background: var(--bl-bg-hover);
+  color: var(--bl-text-primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--bl-violet);
+  outline-offset: 1px;
+}
+
+.btn.active { color: var(--bl-amber); }
+
+.btn-stop {
+  margin-left: auto;
+  color: var(--bl-pink);
+}
+
+.btn-stop:hover {
+  background: rgba(201, 107, 156, 0.15);
+  color: var(--bl-pink);
+}
