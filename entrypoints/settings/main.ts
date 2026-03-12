@@ -193,11 +193,11 @@ publishToggle.addEventListener('change', async () => {
 
 // --- Identity ---
 
-let detectedPubkey = '';
-
 async function detectIdentity() {
   identityLabel.textContent = 'Checking\u2026';
   identityDot.className = 'identity-dot';
+  identityNpub.textContent = '';
+  identityCopy.hidden = true;
 
   let result: any;
   try {
@@ -210,16 +210,9 @@ async function detectIdentity() {
     return;
   }
 
-  if (result && typeof result === 'object' && 'pubkey' in result && result.pubkey) {
-    detectedPubkey = result.pubkey as string;
-    const hex = detectedPubkey;
-    const short = hex.slice(0, 8) + '\u2026' + hex.slice(-8);
-
+  if (result && typeof result === 'object' && 'detected' in result) {
     identityDot.classList.add('connected');
-    identityLabel.textContent = 'Connected via NIP-07';
-    identityNpub.textContent = short;
-    identityNpub.title = hex;
-    identityCopy.hidden = false;
+    identityLabel.textContent = 'Signer detected \u2014 your pubkey will be confirmed before signing';
   } else {
     showIdentityMissing();
   }
@@ -231,20 +224,6 @@ function showIdentityMissing() {
   identityNpub.textContent = '';
   identityCopy.hidden = true;
 }
-
-const COPY_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
-const CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-
-identityCopy.addEventListener('click', async () => {
-  if (!detectedPubkey) return;
-  await navigator.clipboard.writeText(detectedPubkey);
-  identityCopy.classList.add('copied');
-  setIcon(identityCopy, CHECK_SVG);
-  setTimeout(() => {
-    identityCopy.classList.remove('copied');
-    setIcon(identityCopy, COPY_SVG);
-  }, 1500);
-});
 
 // --- Load ---
 
