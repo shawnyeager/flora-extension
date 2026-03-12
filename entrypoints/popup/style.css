@@ -104,7 +104,7 @@ body {
 }
 
 .status-dot.recording {
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -207,7 +207,7 @@ body {
   padding: 13px;
   border: none;
   border-radius: var(--bl-radius-md);
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -229,10 +229,10 @@ body {
   flex-shrink: 0;
 }
 
-.btn-record:hover { background: var(--bl-pink-hover); }
+.btn-record:hover { background: var(--bl-accent-hover); }
 .btn-record:active { transform: scale(0.97); }
 .btn-record:focus-visible {
-  outline: 2px solid var(--bl-pink);
+  outline: 2px solid var(--bl-accent);
   outline-offset: 2px;
 }
 .btn-record:disabled {
@@ -311,7 +311,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -373,12 +373,12 @@ body {
 
 .rec-btn-stop {
   margin-left: auto;
-  color: var(--bl-pink);
+  color: var(--bl-accent);
 }
 
 .rec-btn-stop:hover {
-  background: rgba(201, 107, 156, 0.15);
-  color: var(--bl-pink);
+  background: rgba(157, 72, 225, 0.15);
+  color: var(--bl-accent);
 }
 
 .rec-btn-stop:disabled {

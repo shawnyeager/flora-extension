@@ -80,7 +80,7 @@ body {
 }
 
 .notice-dot.recording {
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -204,7 +204,7 @@ body {
 }
 
 .rec-card:hover .rec-play::before {
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   transform: scale(1.08);
 }
 

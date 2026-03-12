@@ -21,7 +21,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--bl-pink);
+  background: var(--bl-accent);
   flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -83,10 +83,10 @@ body {
 
 .btn-stop {
   margin-left: auto;
-  color: var(--bl-pink);
+  color: var(--bl-accent);
 }
 
 .btn-stop:hover {
-  background: rgba(201, 107, 156, 0.15);
-  color: var(--bl-pink);
+  background: rgba(157, 72, 225, 0.15);
+  color: var(--bl-accent);
 }
