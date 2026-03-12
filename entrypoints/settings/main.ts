@@ -199,27 +199,28 @@ async function detectIdentity() {
   identityLabel.textContent = 'Checking\u2026';
   identityDot.className = 'identity-dot';
 
+  let result: any;
   try {
-    const result = await Promise.race([
+    result = await Promise.race([
       browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
     ]);
-
-    if (result && typeof result === 'object' && 'pubkey' in result && result.pubkey) {
-      detectedPubkey = result.pubkey as string;
-      const hex = detectedPubkey;
-      const short = hex.slice(0, 8) + '\u2026' + hex.slice(-8);
-
-      identityDot.classList.add('connected');
-      identityLabel.textContent = 'Connected via NIP-07';
-      identityNpub.textContent = short;
-      identityNpub.title = hex;
-      identityCopy.hidden = false;
-      setIcon(identityCopy, Icons.copy);
-    } else {
-      showIdentityMissing();
-    }
   } catch {
+    showIdentityMissing();
+    return;
+  }
+
+  if (result && typeof result === 'object' && 'pubkey' in result && result.pubkey) {
+    detectedPubkey = result.pubkey as string;
+    const hex = detectedPubkey;
+    const short = hex.slice(0, 8) + '\u2026' + hex.slice(-8);
+
+    identityDot.classList.add('connected');
+    identityLabel.textContent = 'Connected via NIP-07';
+    identityNpub.textContent = short;
+    identityNpub.title = hex;
+    identityCopy.hidden = false;
+  } else {
     showIdentityMissing();
   }
 }
@@ -231,14 +232,17 @@ function showIdentityMissing() {
   identityCopy.hidden = true;
 }
 
+const COPY_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+const CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
 identityCopy.addEventListener('click', async () => {
   if (!detectedPubkey) return;
   await navigator.clipboard.writeText(detectedPubkey);
   identityCopy.classList.add('copied');
-  setIcon(identityCopy, Icons.check);
+  setIcon(identityCopy, CHECK_SVG);
   setTimeout(() => {
     identityCopy.classList.remove('copied');
-    setIcon(identityCopy, Icons.copy);
+    setIcon(identityCopy, COPY_SVG);
   }, 1500);
 });
 
