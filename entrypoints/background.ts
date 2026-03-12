@@ -25,9 +25,42 @@ let pauseTimestamp = 0;
 
 /** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
 async function findScriptableTab(): Promise<number | null> {
-  if (recordingTabId) return recordingTabId;
-  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  // 1. Tab where user was recording (most likely to have NIP-07 signer)
+  if (recordingTabId) {
+    try {
+      const tab = await browser.tabs.get(recordingTabId);
+      if (tab?.url && /^https?:/.test(tab.url)) return recordingTabId;
+    } catch {
+      // Tab was closed
+      recordingTabId = null;
+    }
+  }
+
+  // 2. Restore from storage (survives service worker restart)
+  if (!recordingTabId) {
+    try {
+      const stored = await browser.storage.local.get('recordingTabId');
+      if (stored.recordingTabId) {
+        const tab = await browser.tabs.get(stored.recordingTabId);
+        if (tab?.url && /^https?:/.test(tab.url)) {
+          recordingTabId = stored.recordingTabId;
+          return recordingTabId;
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Active tab in the last focused window
+  const [active] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
   if (active?.id && active.url && /^https?:/.test(active.url)) return active.id;
+
+  // 4. Any active tab in any window
+  const activeTabs = await browser.tabs.query({ active: true });
+  for (const tab of activeTabs) {
+    if (tab.id && tab.url && /^https?:/.test(tab.url)) return tab.id;
+  }
+
+  // 5. Last resort: any web tab
   const tabs = await browser.tabs.query({ url: ['http://*/*', 'https://*/*'] });
   return tabs[0]?.id ?? null;
 }
@@ -138,10 +171,14 @@ async function signEventDirect(
         const nostr = (window as any).nostr;
         if (!nostr) return { ok: false, error: 'No NIP-07 signer found' };
         if (typeof nostr.signEvent !== 'function') return { ok: false, error: 'window.nostr.signEvent is not a function' };
-        return nostr.signEvent(evt).then(
-          (signed: any) => signed ? { ok: true, data: signed } : { ok: false, error: 'signEvent returned empty' },
-          (err: any) => ({ ok: false, error: String(err) }),
-        );
+        // Race against timeout — some signers hang forever on reject
+        return Promise.race([
+          nostr.signEvent(evt).then(
+            (signed: any) => signed ? { ok: true, data: signed } : { ok: false, error: 'signEvent returned empty' },
+            (err: any) => ({ ok: false, error: String(err) }),
+          ),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: 'Signing timed out — did you reject or close the signer prompt?' }), 15000)),
+        ]);
       },
     });
     return results?.[0]?.result || { ok: false, error: 'scripting.executeScript returned no result' };
@@ -402,7 +439,14 @@ export default defineBackground(() => {
                 relays: settings.nostrRelays,
                 noteContent: pendingNoteContent,
               }),
-            ).catch(console.error);
+            ).catch((err) => {
+              console.error('[background] publish setup failed:', err);
+              // Upload succeeded but publish setup failed — still go to complete
+              if (uploadResult) {
+                publishResult = { noteId: '', blossomUrl: uploadResult.url };
+                setState('complete');
+              }
+            });
           } else {
             // Skip Nostr publish — go straight to complete
             setState('complete');
@@ -513,7 +557,11 @@ export default defineBackground(() => {
                 server,
               }),
             );
-          }).catch(console.error);
+          }).catch((err) => {
+            console.error('[background] confirm upload failed:', err);
+            lastError = err instanceof Error ? err.message : String(err);
+            setState('error');
+          });
           sendResponse({ ok: true });
           return false;
         }
@@ -616,7 +664,11 @@ export default defineBackground(() => {
                 server,
               }),
             );
-          }).catch(console.error);
+          }).catch((err) => {
+            console.error('[background] library upload failed:', err);
+            lastError = err instanceof Error ? err.message : String(err);
+            setState('error');
+          });
           sendResponse({ ok: true });
           return false;
         }
