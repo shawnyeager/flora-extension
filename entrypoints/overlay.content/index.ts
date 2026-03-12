@@ -358,13 +358,17 @@ export default defineContentScript({
         const enabled = !!message.enabled;
         if (enabled !== webcamOn) {
           webcamOn = enabled;
+          const bubble = ui.shadow.querySelector('.bloom-webcam') as HTMLElement;
+          const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
           if (!webcamOn) {
-            webcamBubble.style.display = 'none';
-            const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
+            if (bubble) bubble.style.display = 'none';
             if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
           } else {
-            webcamBubble.style.display = 'block';
-            const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
+            const videoEl = ui.shadow.querySelector('.bloom-webcam video') as HTMLElement;
+            const offEl = ui.shadow.querySelector('.bloom-webcam-off') as HTMLElement;
+            if (videoEl) videoEl.style.display = 'block';
+            if (offEl) offEl.style.display = 'none';
+            if (bubble) bubble.style.display = 'block';
             if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
           }
         }

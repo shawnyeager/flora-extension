@@ -126,7 +126,12 @@ async function loadVideo() {
 
     if (record?.data) {
       videoBlobUrl = URL.createObjectURL(new Blob([record.data], { type: 'video/mp4' }));
-      previewVideo.src = videoBlobUrl;
+      // Wait for metadata so the video element has intrinsic dimensions before we show the view
+      await new Promise<void>((resolve) => {
+        previewVideo.onloadedmetadata = () => resolve();
+        previewVideo.onerror = () => resolve();
+        previewVideo.src = videoBlobUrl;
+      });
       confirmVideo.src = videoBlobUrl;
       videoLoaded = true;
     }
