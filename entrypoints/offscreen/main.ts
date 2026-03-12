@@ -385,7 +385,7 @@ async function deleteRecording(hash: string): Promise<boolean> {
   });
 }
 
-async function markUploaded(hash: string, blossomUrl: string): Promise<boolean> {
+async function markUploaded(hash: string, blossomUrl: string, noteId?: string): Promise<boolean> {
   const db = await openDB();
   const tx = db.transaction('recordings', 'readwrite');
   const store = tx.objectStore('recordings');
@@ -396,6 +396,7 @@ async function markUploaded(hash: string, blossomUrl: string): Promise<boolean> 
       const record = getReq.result;
       record.uploaded = true;
       record.blossomUrl = blossomUrl;
+      if (noteId) record.noteId = noteId;
       const putReq = store.put(record);
       putReq.onsuccess = () => { db.close(); resolve(true); };
       putReq.onerror = () => { db.close(); resolve(false); };
@@ -749,7 +750,7 @@ browser.runtime.onMessage.addListener(
         return true;
 
       case MessageType.MARK_UPLOADED:
-        markUploaded((message as any).hash, (message as any).blossomUrl).then((ok) => sendResponse({ ok }));
+        markUploaded((message as any).hash, (message as any).blossomUrl, (message as any).noteId).then((ok) => sendResponse({ ok }));
         return true;
 
       case MessageType.GET_RECORDING_BY_HASH:

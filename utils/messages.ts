@@ -255,6 +255,7 @@ export interface RecordingMeta {
   timestamp: number;
   uploaded: boolean;
   blossomUrl?: string;
+  noteId?: string;
   thumbnail?: string;
 }
 

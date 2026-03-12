@@ -268,14 +268,12 @@ body {
   z-index: 1;
 }
 
-/* Uploaded indicator — badge instead of tiny dot */
+/* Upload status badges */
 
-.rec-uploaded-badge {
+.rec-badge {
   position: absolute;
   top: 6px;
   right: 6px;
-  background: rgba(155, 110, 199, 0.85);
-  color: white;
   font-size: 9px;
   font-weight: 700;
   padding: 1px 6px;
@@ -283,6 +281,18 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   z-index: 1;
+}
+
+/* Uploaded to Blossom only — subtle, informational */
+.rec-badge-uploaded {
+  background: rgba(126, 200, 227, 0.15);
+  color: var(--bl-cyan);
+}
+
+/* Posted to Nostr — stronger, it's out there */
+.rec-badge-posted {
+  background: rgba(155, 110, 199, 0.2);
+  color: var(--bl-violet);
 }
 
 /* --- Checkbox (Google Photos pattern) --- */

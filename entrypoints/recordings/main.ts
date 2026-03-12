@@ -430,11 +430,16 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
   dur.textContent = fmtDuration(rec.duration);
   thumb.append(dur);
 
-  // Uploaded indicator
+  // Upload status badge
   if (rec.uploaded) {
     const badge = document.createElement('span');
-    badge.className = 'rec-uploaded-badge';
-    badge.textContent = 'Shared';
+    if (rec.noteId) {
+      badge.className = 'rec-badge rec-badge-posted';
+      badge.textContent = 'Posted';
+    } else {
+      badge.className = 'rec-badge rec-badge-uploaded';
+      badge.textContent = 'Uploaded';
+    }
     thumb.append(badge);
   }
 

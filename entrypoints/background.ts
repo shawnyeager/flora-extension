@@ -466,6 +466,16 @@ export default defineBackground(() => {
           const msg = message as any;
           console.log(`[background] published note: ${msg.noteId}`);
           publishResult = { noteId: msg.noteId, blossomUrl: msg.blossomUrl };
+          // Update IDB record with noteId
+          if (uploadResult) {
+            browser.runtime.sendMessage({
+              type: MessageType.MARK_UPLOADED,
+              target: 'offscreen',
+              hash: uploadResult.sha256,
+              blossomUrl: uploadResult.url,
+              noteId: msg.noteId,
+            }).catch(() => {});
+          }
           setState('complete');
           return false;
         }
