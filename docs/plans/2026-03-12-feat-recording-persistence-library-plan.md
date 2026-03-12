@@ -1,7 +1,7 @@
 ---
 title: "feat: Recording persistence and local library"
 type: feat
-status: active
+status: completed
 date: 2026-03-12
 ---
 
