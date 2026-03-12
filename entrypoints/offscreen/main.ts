@@ -209,14 +209,54 @@ function cleanup() {
   target = null;
 }
 
-async function storeRecording(buffer: ArrayBuffer, duration: number) {
-  const db = await openDB();
-  const tx = db.transaction('recordings', 'readwrite');
-  const store = tx.objectStore('recordings');
+function generateThumbnail(buffer: ArrayBuffer): Promise<string> {
+  const blob = new Blob([buffer], { type: 'video/mp4' });
+  const url = URL.createObjectURL(blob);
 
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'auto';
+
+    const cleanup = () => { URL.revokeObjectURL(url); };
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      const scale = 320 / (video.videoWidth || 320);
+      canvas.width = 320;
+      canvas.height = Math.round((video.videoHeight || 180) * scale);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      cleanup();
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+
+    video.onerror = () => { cleanup(); reject(new Error('Thumbnail generation failed')); };
+    // Timeout after 5s
+    setTimeout(() => { cleanup(); reject(new Error('Thumbnail generation timed out')); }, 5000);
+    video.src = url;
+  });
+}
+
+async function storeRecording(buffer: ArrayBuffer, duration: number) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+  let thumbnail: string | undefined;
+  try {
+    thumbnail = await generateThumbnail(buffer);
+  } catch (err) {
+    console.warn('[offscreen] thumbnail generation failed:', err);
+  }
+
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readwrite');
+  const store = tx.objectStore('recordings');
 
   await new Promise<void>((resolve, reject) => {
     const req = store.put({
@@ -226,6 +266,7 @@ async function storeRecording(buffer: ArrayBuffer, duration: number) {
       duration,
       timestamp: Date.now(),
       uploaded: false,
+      thumbnail,
     });
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
@@ -298,8 +339,8 @@ async function listRecordings(): Promise<{ hash: string; size: number; duration:
     req.onsuccess = () => {
       const cursor = req.result;
       if (cursor) {
-        const { hash, size, duration, timestamp, uploaded, blossomUrl } = cursor.value;
-        results.push({ hash, size, duration, timestamp, uploaded: !!uploaded, blossomUrl });
+        const { hash, size, duration, timestamp, uploaded, blossomUrl, thumbnail } = cursor.value;
+        results.push({ hash, size, duration, timestamp, uploaded: !!uploaded, blossomUrl, thumbnail });
         cursor.continue();
       } else {
         db.close();
@@ -360,6 +401,57 @@ async function getRecordingByHash(hash: string): Promise<{ dataUrl: string; dura
     };
     req.onerror = () => { db.close(); resolve(null); };
   });
+}
+
+async function generateThumbnailForHash(hash: string): Promise<string | null> {
+  const db = await openDB();
+
+  const record = await new Promise<any>((resolve) => {
+    const tx = db.transaction('recordings', 'readonly');
+    const req = tx.objectStore('recordings').get(hash);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+
+  if (!record?.data) { db.close(); return null; }
+
+  let thumbnail: string;
+  try {
+    thumbnail = await generateThumbnail(record.data);
+  } catch {
+    db.close();
+    return null;
+  }
+
+  // Save it back
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction('recordings', 'readwrite');
+    record.thumbnail = thumbnail;
+    const req = tx.objectStore('recordings').put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+  });
+
+  db.close();
+  return thumbnail;
+}
+
+async function deleteRecordings(hashes: string[]): Promise<number> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readwrite');
+  const store = tx.objectStore('recordings');
+  let deleted = 0;
+
+  for (const hash of hashes) {
+    await new Promise<void>((resolve) => {
+      const req = store.delete(hash);
+      req.onsuccess = () => { deleted++; resolve(); };
+      req.onerror = () => resolve();
+    });
+  }
+
+  db.close();
+  return deleted;
 }
 
 async function uploadRecordingByHash(hash: string, serverOverride?: string) {
@@ -645,6 +737,14 @@ browser.runtime.onMessage.addListener(
         sendResponse({ ok: true });
         return false;
       }
+
+      case MessageType.GENERATE_THUMBNAIL:
+        generateThumbnailForHash((message as any).hash).then((thumbnail) => sendResponse({ thumbnail }));
+        return true;
+
+      case MessageType.DELETE_RECORDINGS:
+        deleteRecordings((message as any).hashes).then((count) => sendResponse({ ok: true, count }));
+        return true;
 
       default:
         return false;

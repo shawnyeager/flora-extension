@@ -479,6 +479,32 @@ export default defineBackground(() => {
           return true;
         }
 
+        case MessageType.GENERATE_THUMBNAIL: {
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                ...message,
+                target: 'offscreen',
+              }),
+            )
+            .then((data) => sendResponse(data))
+            .catch(() => sendResponse({ thumbnail: null }));
+          return true;
+        }
+
+        case MessageType.DELETE_RECORDINGS: {
+          ensureOffscreenDocument()
+            .then(() =>
+              browser.runtime.sendMessage({
+                ...message,
+                target: 'offscreen',
+              }),
+            )
+            .then((data) => sendResponse(data))
+            .catch(() => sendResponse({ ok: false }));
+          return true;
+        }
+
         case MessageType.UPLOAD_FROM_LIBRARY: {
           const msg = message as any;
           if (currentState !== 'idle') {

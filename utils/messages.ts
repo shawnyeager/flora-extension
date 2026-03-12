@@ -64,6 +64,8 @@ export const MessageType = {
   MARK_UPLOADED: 'mark_uploaded',
   GET_RECORDING_BY_HASH: 'get_recording_by_hash',
   UPLOAD_FROM_LIBRARY: 'upload_from_library',
+  GENERATE_THUMBNAIL: 'generate_thumbnail',
+  DELETE_RECORDINGS: 'delete_recordings',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -245,6 +247,7 @@ export interface RecordingMeta {
   timestamp: number;
   uploaded: boolean;
   blossomUrl?: string;
+  thumbnail?: string;
 }
 
 export interface ListRecordingsMessage extends BaseMessage {
@@ -273,6 +276,16 @@ export interface UploadFromLibraryMessage extends BaseMessage {
   serverOverride?: string;
   publishToNostr: boolean;
   noteContent?: string;
+}
+
+export interface GenerateThumbnailMessage extends BaseMessage {
+  type: typeof MessageType.GENERATE_THUMBNAIL;
+  hash: string;
+}
+
+export interface DeleteRecordingsMessage extends BaseMessage {
+  type: typeof MessageType.DELETE_RECORDINGS;
+  hashes: string[];
 }
 
 export type Message =
@@ -311,4 +324,6 @@ export type Message =
   | DeleteRecordingMessage
   | MarkUploadedMessage
   | GetRecordingByHashMessage
-  | UploadFromLibraryMessage;
+  | UploadFromLibraryMessage
+  | GenerateThumbnailMessage
+  | DeleteRecordingsMessage;

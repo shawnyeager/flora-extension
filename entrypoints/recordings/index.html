@@ -3,29 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bloom Recordings</title>
+  <title>Bloom — Recordings</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div class="container">
     <header class="header">
       <img src="/icon/48.png" alt="" class="header-icon">
-      <div>
-        <h1 class="header-title">Bloom</h1>
-        <p class="header-sub">Recordings</p>
-      </div>
+      <h1 class="header-title">Recordings</h1>
+      <span id="count" class="header-count"></span>
     </header>
-    <div id="status-bar" class="status-bar">
-      <div class="status-dot"></div>
-      <span class="status-text">Ready</span>
+    <div id="notice" class="notice" hidden>
+      <div class="notice-dot"></div>
+      <span class="notice-text"></span>
     </div>
-    <div id="list"></div>
-    <div id="empty" class="empty" style="display:none">
-      <div class="empty-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      </div>
-      <p class="empty-title">No recordings yet</p>
-      <p class="empty-hint">Start a recording from the Bloom popup to see it here.</p>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" hidden>
+      <p class="empty-text">No recordings yet</p>
+      <p class="empty-hint">Record your screen from the Bloom toolbar icon. Your clips will appear here.</p>
+    </div>
+    <div id="bulk-bar" class="bulk-bar">
+      <span id="bulk-count" class="bulk-count"></span>
+      <button id="bulk-delete" class="bulk-delete">Delete</button>
+      <button id="bulk-cancel" class="bulk-cancel">Cancel</button>
     </div>
   </div>
   <script src="./main.ts" type="module"></script>
