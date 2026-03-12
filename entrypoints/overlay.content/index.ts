@@ -95,21 +95,14 @@ export default defineContentScript({
           e.stopPropagation();
           webcamOn = !webcamOn;
           if (!webcamOn) {
-            webcamVideoEl.style.display = 'none';
-            webcamOff.style.display = 'flex';
-            webcamBubble.classList.add('collapsed');
-            camToggle.innerHTML = Icons.camera;
-            camToggle.title = 'Turn camera on';
-            // Update controls bar camera btn
+            webcamBubble.style.display = 'none';
             const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
             if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
             webcamVideoEl.style.display = 'block';
             webcamOff.style.display = 'none';
-            webcamBubble.classList.remove('collapsed');
-            camToggle.innerHTML = Icons.cameraOff;
-            camToggle.title = 'Turn camera off';
+            webcamBubble.style.display = 'block';
             const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
             if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
@@ -217,8 +210,20 @@ export default defineContentScript({
         camBtn.innerHTML = Icons.camera;
         camBtn.title = 'Turn camera off';
         camBtn.addEventListener('click', () => {
-          // Delegate to the bubble's toggle — keeps state in sync
-          camToggle.click();
+          webcamOn = !webcamOn;
+          if (!webcamOn) {
+            webcamBubble.style.display = 'none';
+            camBtn.innerHTML = Icons.cameraOff;
+            camBtn.classList.add('active');
+            browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
+          } else {
+            webcamVideoEl.style.display = 'block';
+            webcamOff.style.display = 'none';
+            webcamBubble.style.display = 'block';
+            camBtn.innerHTML = Icons.camera;
+            camBtn.classList.remove('active');
+            browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
+          }
         });
 
         const stopBtn = document.createElement('button');
@@ -329,32 +334,58 @@ export default defineContentScript({
 <div class="br-backdrop"></div>
 <div class="br-panel">
   <div class="br-header">
-    <span class="br-title">Bloom</span>
-    <a class="br-settings">Settings</a>
+    <div class="br-header-left">
+      <span class="br-logo">${Icons.camera}</span>
+      <span class="br-title">Bloom</span>
+    </div>
+    <a class="br-settings">${Icons.stop.replace('14', '12')} Settings</a>
   </div>
-  <video class="br-video" controls playsinline></video>
-  <div class="br-meta"></div>
+
+  <div class="br-video-wrap">
+    <video class="br-video" controls playsinline></video>
+    <div class="br-meta"></div>
+  </div>
 
   <div class="br-view br-preview">
     <div class="br-dest">
-      <div class="br-field"><label>Server</label><span class="br-server"></span></div>
-      <div class="br-field br-relay-row"><label>Relays</label><span class="br-relays"></span></div>
-      <div class="br-field"><label>Identity</label><span class="br-identity"></span></div>
+      <div class="br-dest-row">
+        <span class="br-dest-label">Server</span>
+        <span class="br-server br-dest-value"></span>
+      </div>
+      <div class="br-dest-row br-relay-row">
+        <span class="br-dest-label">Relays</span>
+        <span class="br-relays br-dest-value"></span>
+      </div>
+      <div class="br-dest-row">
+        <span class="br-dest-label">Identity</span>
+        <span class="br-identity br-dest-value"></span>
+      </div>
       <div class="br-warning"></div>
     </div>
     <div class="br-actions">
-      <button class="br-btn-primary br-btn-upload">Upload & Share\u2026</button>
-      <button class="br-btn-secondary br-btn-download">Download MP4</button>
-      <button class="br-btn-ghost br-btn-discard">Discard</button>
+      <button class="br-btn-primary br-btn-upload">Upload & Share</button>
+      <div class="br-actions-row">
+        <button class="br-btn-secondary br-btn-download">Download MP4</button>
+        <button class="br-btn-ghost br-btn-discard">Discard</button>
+      </div>
     </div>
   </div>
 
   <div class="br-view br-confirm" style="display:none">
     <div class="br-dest br-dest-edit">
-      <div class="br-field"><label>Server</label><input class="br-confirm-server" type="text" spellcheck="false"></div>
+      <div class="br-dest-row">
+        <span class="br-dest-label">Server</span>
+        <input class="br-confirm-server br-dest-input" type="text" spellcheck="false">
+      </div>
       <label class="br-check"><input type="checkbox" class="br-confirm-publish" checked> Publish to Nostr</label>
-      <div class="br-field br-confirm-relay-row"><label>Relays</label><span class="br-confirm-relays"></span></div>
-      <div class="br-field"><label>Identity</label><span class="br-confirm-identity"></span></div>
+      <div class="br-dest-row br-confirm-relay-row">
+        <span class="br-dest-label">Relays</span>
+        <span class="br-confirm-relays br-dest-value"></span>
+      </div>
+      <div class="br-dest-row">
+        <span class="br-dest-label">Identity</span>
+        <span class="br-confirm-identity br-dest-value"></span>
+      </div>
       <div class="br-confirm-warning"></div>
     </div>
     <div class="br-actions">
@@ -364,7 +395,7 @@ export default defineContentScript({
   </div>
 
   <div class="br-view br-progress" style="display:none">
-    <div class="br-progress-section">
+    <div class="br-center-section">
       <div class="br-progress-status"></div>
       <div class="br-progress-track"><div class="br-progress-fill"></div></div>
       <div class="br-progress-detail"></div>
@@ -372,9 +403,9 @@ export default defineContentScript({
   </div>
 
   <div class="br-view br-complete" style="display:none">
-    <div class="br-complete-section">
+    <div class="br-center-section">
       <div class="br-complete-icon">\u2713</div>
-      <div class="br-complete-title">Upload Complete</div>
+      <div class="br-complete-title">Shared successfully</div>
       <a class="br-result-link" target="_blank"></a>
       <div class="br-actions">
         <button class="br-btn-primary br-btn-copy">Copy Link</button>
@@ -384,7 +415,7 @@ export default defineContentScript({
   </div>
 
   <div class="br-view br-error" style="display:none">
-    <div class="br-error-section">
+    <div class="br-center-section">
       <div class="br-error-title">Upload Failed</div>
       <div class="br-error-message"></div>
       <div class="br-actions">
