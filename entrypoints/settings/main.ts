@@ -21,24 +21,30 @@ async function detectIdentity() {
   identityEl.classList.remove('error');
 
   try {
-    const result = await browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE });
+    const result = await Promise.race([
+      browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+    ]);
     identityEl.classList.remove('checking');
 
-    if (result && 'pubkey' in result && result.pubkey) {
+    if (result && typeof result === 'object' && 'pubkey' in result && result.pubkey) {
       const hex = result.pubkey as string;
       identityEl.textContent = hex.length > 16
         ? `${hex.slice(0, 8)}\u2026${hex.slice(-8)}`
         : hex;
       identityEl.title = hex;
     } else {
-      identityEl.classList.add('error');
-      identityEl.textContent = 'No NIP-07 signer detected. Install a Nostr signer extension.';
+      showIdentityFallback();
     }
   } catch {
-    identityEl.classList.remove('checking');
-    identityEl.classList.add('error');
-    identityEl.textContent = 'Detected automatically from your NIP-07 signer when recording.';
+    showIdentityFallback();
   }
+}
+
+function showIdentityFallback() {
+  identityEl.classList.remove('checking');
+  identityEl.classList.add('error');
+  identityEl.textContent = 'Detected from your NIP-07 signer when recording.';
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
