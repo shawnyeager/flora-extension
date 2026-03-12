@@ -1,5 +1,4 @@
 import { MessageType, type RecordingMeta } from '@/utils/messages';
-import { getSettings } from '@/utils/settings';
 import { Icons } from '@/utils/icons';
 import type { ExtensionState } from '@/utils/state';
 
@@ -20,11 +19,24 @@ const playerVideo = document.getElementById('player-video') as HTMLVideoElement;
 const playerClose = document.getElementById('player-close')!;
 const playerBackdrop = playerOverlay.querySelector('.player-backdrop')!;
 
+const confirmOverlay = document.getElementById('upload-confirm')!;
+const confirmBackdrop = confirmOverlay.querySelector('.confirm-backdrop')!;
+const confirmThumb = document.getElementById('confirm-thumb') as HTMLImageElement;
+const confirmInfo = document.getElementById('confirm-info')!;
+const confirmServer = document.getElementById('confirm-server')!;
+const confirmNostr = document.getElementById('confirm-nostr') as HTMLInputElement;
+const confirmRelays = document.getElementById('confirm-relays')!;
+const confirmIdentity = document.getElementById('confirm-identity')!;
+const confirmWarning = document.getElementById('confirm-warning')!;
+const confirmUploadBtn = document.getElementById('confirm-upload-btn') as HTMLButtonElement;
+const confirmCancelBtn = document.getElementById('confirm-cancel-btn')!;
+
 // --- State ---
 
 let currentState: ExtensionState = 'idle';
 let recordings: RecordingMeta[] = [];
 const selected = new Set<string>();
+let pendingHash: string | null = null;
 
 // --- Helpers ---
 
@@ -124,8 +136,111 @@ function closePlayer() {
 playerClose.addEventListener('click', closePlayer);
 playerBackdrop.addEventListener('click', closePlayer);
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !playerOverlay.hidden) closePlayer();
+  if (e.key === 'Escape' && !confirmOverlay.hidden) {
+    hideUploadConfirm();
+  } else if (e.key === 'Escape' && !playerOverlay.hidden) {
+    closePlayer();
+  }
 });
+
+// --- Upload confirmation ---
+
+async function showUploadConfirm(rec: RecordingMeta) {
+  pendingHash = rec.hash;
+
+  // Set thumbnail and info
+  confirmThumb.src = rec.thumbnail || '';
+  confirmThumb.alt = `Recording ${fmtDuration(rec.duration)}`;
+  confirmInfo.textContent = `${fmtDuration(rec.duration)} · ${fmtBytes(rec.size)}`;
+
+  // Reset button state
+  confirmUploadBtn.disabled = false;
+  confirmUploadBtn.textContent = 'Confirm Upload';
+
+  // Show overlay (data loads async)
+  confirmOverlay.hidden = false;
+
+  // Fetch confirmation data from background
+  const data = await browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
+  if (!data) {
+    confirmServer.textContent = 'Could not load settings';
+    confirmNostr.checked = false;
+    confirmRelays.textContent = '';
+    confirmIdentity.textContent = '—';
+    confirmWarning.style.display = 'none';
+    return;
+  }
+
+  confirmServer.textContent = data.server;
+  confirmNostr.checked = data.publishToNostr;
+  updateRelayDisplay(data.relays);
+  updateIdentityDisplay(data.npub, data.signerAvailable, data.bridgeError);
+}
+
+function hideUploadConfirm() {
+  confirmOverlay.hidden = true;
+  pendingHash = null;
+}
+
+function updateRelayDisplay(relays: string[]) {
+  if (confirmNostr.checked && relays?.length) {
+    confirmRelays.textContent = relays.join(', ');
+    confirmRelays.style.display = '';
+  } else {
+    confirmRelays.style.display = 'none';
+  }
+}
+
+function updateIdentityDisplay(npub: string | null, signerAvailable: boolean, bridgeError: string | null) {
+  if (npub) {
+    const short = npub.length > 20 ? `${npub.slice(0, 12)}…${npub.slice(-8)}` : npub;
+    confirmIdentity.textContent = short;
+    confirmWarning.style.display = 'none';
+  } else {
+    confirmIdentity.textContent = '—';
+    if (bridgeError) {
+      confirmWarning.textContent = bridgeError;
+      confirmWarning.style.display = '';
+    } else {
+      confirmWarning.textContent = 'No NIP-07 signer detected. Install nos2x or Alby to sign Nostr events.';
+      confirmWarning.style.display = confirmNostr.checked ? '' : 'none';
+    }
+  }
+}
+
+confirmNostr.addEventListener('change', () => {
+  // Toggle relay list visibility
+  const relayText = confirmRelays.textContent;
+  if (confirmNostr.checked && relayText) {
+    confirmRelays.style.display = '';
+  } else {
+    confirmRelays.style.display = 'none';
+  }
+  // Show/hide signer warning when no signer
+  if (confirmIdentity.textContent === '—') {
+    confirmWarning.style.display = confirmNostr.checked ? '' : 'none';
+  }
+});
+
+confirmUploadBtn.addEventListener('click', async () => {
+  if (!pendingHash) return;
+  confirmUploadBtn.disabled = true;
+  confirmUploadBtn.textContent = 'Uploading…';
+  const resp = await browser.runtime.sendMessage({
+    type: MessageType.UPLOAD_FROM_LIBRARY,
+    hash: pendingHash,
+    publishToNostr: confirmNostr.checked,
+  });
+  if (!resp?.ok) {
+    confirmUploadBtn.disabled = false;
+    confirmUploadBtn.textContent = 'Confirm Upload';
+  } else {
+    hideUploadConfirm();
+  }
+});
+
+confirmCancelBtn.addEventListener('click', hideUploadConfirm);
+confirmBackdrop.addEventListener('click', hideUploadConfirm);
 
 // --- Status notice ---
 
@@ -309,18 +424,9 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
     upBtn.className = 'rec-btn rec-btn-text btn-upload';
     upBtn.textContent = 'Upload';
     upBtn.disabled = currentState !== 'idle';
-    upBtn.addEventListener('click', async (e) => {
+    upBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const settings = await getSettings();
-      const resp = await browser.runtime.sendMessage({
-        type: MessageType.UPLOAD_FROM_LIBRARY,
-        hash: rec.hash,
-        publishToNostr: settings.publishToNostr,
-      });
-      if (!resp?.ok) {
-        upBtn.textContent = 'Not now';
-        setTimeout(() => { upBtn.textContent = 'Upload'; }, 1500);
-      }
+      showUploadConfirm(rec);
     });
     actions.append(upBtn);
   }
@@ -469,6 +575,10 @@ browser.runtime.onMessage.addListener((message) => {
     updateStatus(message.state);
     if (message.state === 'idle' || message.state === 'complete' || message.state === 'preview') {
       loadRecordings();
+    }
+    // Close confirmation panel when upload starts
+    if (message.state === 'uploading' && !confirmOverlay.hidden) {
+      hideUploadConfirm();
     }
     // Update upload button states
     gridEl.querySelectorAll('.btn-upload').forEach((btn) => {

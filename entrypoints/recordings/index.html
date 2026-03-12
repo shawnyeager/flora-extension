@@ -28,6 +28,36 @@
       <button id="bulk-cancel" class="bulk-cancel">Cancel</button>
     </div>
   </div>
+  <div id="upload-confirm" class="confirm-overlay" hidden>
+    <div class="confirm-backdrop"></div>
+    <div class="confirm-panel">
+      <h2>Review before uploading</h2>
+      <div class="confirm-preview">
+        <img id="confirm-thumb" class="confirm-thumb" alt="" />
+        <span id="confirm-info" class="confirm-info"></span>
+      </div>
+      <div class="confirm-field">
+        <label>Upload to</label>
+        <div id="confirm-server" class="confirm-value mono"></div>
+      </div>
+      <div class="confirm-field">
+        <label class="confirm-check-label">
+          <input type="checkbox" id="confirm-nostr" />
+          Publish note to Nostr
+        </label>
+        <div id="confirm-relays" class="confirm-sub"></div>
+      </div>
+      <div class="confirm-field">
+        <label>Signing as</label>
+        <div id="confirm-identity" class="confirm-value mono"></div>
+      </div>
+      <div id="confirm-warning" class="confirm-warning" style="display:none"></div>
+      <div class="confirm-actions">
+        <button id="confirm-upload-btn" class="confirm-btn-primary">Confirm Upload</button>
+        <button id="confirm-cancel-btn" class="confirm-btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
   <div id="player" class="player-overlay" hidden>
     <div class="player-backdrop"></div>
     <div class="player-content">
