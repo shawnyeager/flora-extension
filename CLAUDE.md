@@ -29,7 +29,7 @@ Content creators and Nostr power users who want fast, frictionless async video s
 
 **Color palette**: Derived from the logo — overlapping translucent petals of pink, violet, and cyan around a dark lens center.
 
-- **Primary accent**: Bloom pink (`oklch(72% 0.17 350)` / ~#e87da0) — the warmest petal, used for primary actions and recording states
+- **Primary accent**: Bloom berry (`oklch(62% 0.15 340)` / ~#c96b9c) — the petal overlap between pink and violet, used for primary actions and recording states
 - **Secondary accent**: Bloom violet (`oklch(62% 0.19 295)` / ~#9b6ec7) — the deepest petal overlap, used for selection, focus, and interactive highlights
 - **Tertiary accent**: Bloom cyan (`oklch(78% 0.12 210)` / ~#7ec8e3) — the coolest petal, used for links, informational states, and secondary buttons
 - **Success**: Soft green (`oklch(76% 0.15 155)` / ~#4ade80)

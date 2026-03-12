@@ -25,9 +25,9 @@
   --bl-text-inverse: #111114;
 
   /* Accent — Bloom palette (derived from logo) */
-  --bl-pink: #e87da0;
-  --bl-pink-hover: #d4658b;
-  --bl-pink-subtle: rgba(232, 125, 160, 0.12);
+  --bl-pink: #c96b9c;
+  --bl-pink-hover: #b35a88;
+  --bl-pink-subtle: rgba(201, 107, 156, 0.12);
   --bl-violet: #9b6ec7;
   --bl-violet-hover: #8558b3;
   --bl-violet-subtle: rgba(155, 110, 199, 0.12);
