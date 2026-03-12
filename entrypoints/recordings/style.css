@@ -159,6 +159,33 @@ body {
   height: 32px;
 }
 
+/* Play icon — centered, visible on hover */
+
+.rec-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--bl-duration-fast);
+  pointer-events: none;
+}
+
+.rec-play svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+}
+
+.rec-card:hover .rec-play {
+  opacity: 1;
+}
+
+/* In selection mode: hide play icon */
+.grid.selecting .rec-play {
+  opacity: 0 !important;
+}
+
 /* Hover scrim on thumbnail */
 
 .rec-thumb::after {
@@ -456,6 +483,61 @@ body {
   max-width: 280px;
   margin: 0 auto;
   line-height: 1.6;
+}
+
+/* --- Video player lightbox --- */
+
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-overlay[hidden] { display: none; }
+
+.player-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.player-content {
+  position: relative;
+  width: 90vw;
+  max-width: 800px;
+}
+
+.player-video {
+  width: 100%;
+  border-radius: var(--bl-radius-md);
+  background: #000;
+  display: block;
+}
+
+.player-close {
+  position: absolute;
+  top: -36px;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--bl-text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color var(--bl-duration-fast), background var(--bl-duration-fast);
+}
+
+.player-close:hover {
+  color: var(--bl-text-primary);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* --- Animations --- */

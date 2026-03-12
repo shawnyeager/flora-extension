@@ -44,7 +44,7 @@ async function detectIdentity() {
 function showIdentityFallback() {
   identityEl.classList.remove('checking');
   identityEl.classList.add('error');
-  identityEl.textContent = 'Detected from your NIP-07 signer when recording.';
+  identityEl.textContent = 'No NIP-07 signer found';
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;

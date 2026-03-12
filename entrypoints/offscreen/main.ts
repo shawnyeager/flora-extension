@@ -226,13 +226,14 @@ function generateThumbnail(buffer: ArrayBuffer): Promise<string> {
 
     video.onseeked = () => {
       const canvas = document.createElement('canvas');
-      const scale = 320 / (video.videoWidth || 320);
-      canvas.width = 320;
-      canvas.height = Math.round((video.videoHeight || 180) * scale);
+      const targetW = 640;
+      const scale = targetW / (video.videoWidth || targetW);
+      canvas.width = targetW;
+      canvas.height = Math.round((video.videoHeight || 360) * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       cleanup();
-      resolve(canvas.toDataURL('image/jpeg', 0.6));
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
 
     video.onerror = () => { cleanup(); reject(new Error('Thumbnail generation failed')); };

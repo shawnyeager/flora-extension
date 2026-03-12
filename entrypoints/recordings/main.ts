@@ -14,6 +14,10 @@ const bulkBar = document.getElementById('bulk-bar')!;
 const bulkCount = document.getElementById('bulk-count')!;
 const bulkDeleteBtn = document.getElementById('bulk-delete')!;
 const bulkCancelBtn = document.getElementById('bulk-cancel')!;
+const playerOverlay = document.getElementById('player')!;
+const playerVideo = document.getElementById('player-video') as HTMLVideoElement;
+const playerClose = document.getElementById('player-close')!;
+const playerBackdrop = playerOverlay.querySelector('.player-backdrop')!;
 
 // --- State ---
 
@@ -87,6 +91,40 @@ function clearSelection() {
   selected.clear();
   updateSelectionUI();
 }
+
+// --- Video player ---
+
+async function openPlayer(hash: string) {
+  playerOverlay.hidden = false;
+  playerVideo.src = '';
+  playerVideo.poster = '';
+
+  // Show thumbnail as poster while loading
+  const rec = recordings.find((r) => r.hash === hash);
+  if (rec?.thumbnail) playerVideo.poster = rec.thumbnail;
+
+  const result = await browser.runtime.sendMessage({
+    type: MessageType.GET_RECORDING_BY_HASH,
+    hash,
+  });
+  if (result?.dataUrl) {
+    playerVideo.src = result.dataUrl;
+    playerVideo.play();
+  }
+}
+
+function closePlayer() {
+  playerOverlay.hidden = true;
+  playerVideo.pause();
+  playerVideo.removeAttribute('src');
+  playerVideo.load();
+}
+
+playerClose.addEventListener('click', closePlayer);
+playerBackdrop.addEventListener('click', closePlayer);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !playerOverlay.hidden) closePlayer();
+});
 
 // --- Status notice ---
 
@@ -198,6 +236,12 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
     });
   }
 
+  // Play icon overlay
+  const playIcon = document.createElement('div');
+  playIcon.className = 'rec-play';
+  playIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="8 5 20 12 8 19"/></svg>';
+  thumb.append(playIcon);
+
   // Duration overlay
   const dur = document.createElement('span');
   dur.className = 'rec-duration';
@@ -212,12 +256,12 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
     thumb.append(badge);
   }
 
-  // Click thumbnail to open or toggle selection
+  // Click thumbnail to play or toggle selection
   thumb.addEventListener('click', () => {
     if (isSelecting()) {
       toggleSelect(rec.hash);
-    } else if (rec.uploaded && rec.blossomUrl) {
-      window.open(rec.blossomUrl, '_blank');
+    } else {
+      openPlayer(rec.hash);
     }
   });
 
