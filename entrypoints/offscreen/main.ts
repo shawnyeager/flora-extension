@@ -366,15 +366,19 @@ async function uploadRecording(serverOverride?: string) {
 
 // --- Nostr Publishing ---
 
-async function publishNote(blossomUrl: string, sha256: string, size: number) {
+async function publishNote(blossomUrl: string, sha256: string, size: number, noteContent?: string) {
   try {
     const settings = await getSettings();
     const signer = createSigner();
 
+    const text = noteContent?.trim();
+    const content = text ? `${text}\n\n${blossomUrl}` : blossomUrl;
+    const alt = text ? text.slice(0, 100) : 'Screen recording';
+
     const draft = {
       kind: 1,
       created_at: Math.floor(Date.now() / 1000),
-      content: blossomUrl,
+      content,
       tags: [
         ['r', blossomUrl],
         ['imeta',
@@ -382,7 +386,7 @@ async function publishNote(blossomUrl: string, sha256: string, size: number) {
           `x ${sha256}`,
           `m video/mp4`,
           `size ${size}`,
-          `alt Screen recording`,
+          `alt ${alt}`,
         ],
       ],
     };
@@ -480,7 +484,7 @@ browser.runtime.onMessage.addListener(
 
       case MessageType.PUBLISH_NOTE: {
         const msg = message as any;
-        publishNote(msg.blossomUrl, msg.sha256, msg.size);
+        publishNote(msg.blossomUrl, msg.sha256, msg.size, msg.noteContent);
         sendResponse({ ok: true });
         return false;
       }

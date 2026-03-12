@@ -86,6 +86,17 @@
   transition: none !important;
 }
 
+@keyframes bloom-webcam-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.bloom-webcam.entering {
+  animation: bloom-webcam-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Corner snap positions */
 .bloom-webcam.pos-bl { bottom: 80px; left: 24px; right: auto; top: auto; }
 .bloom-webcam.pos-br { bottom: 80px; right: 24px; left: auto; top: auto; }
@@ -478,6 +489,44 @@
 .br-dest-input:focus {
   outline: none;
   border-color: var(--bl-blue);
+}
+
+.br-confirm-note {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--bl-border-muted);
+  border-radius: var(--bl-radius-sm);
+  background: var(--bl-bg-base);
+  color: var(--bl-text-primary);
+  font-size: 13px;
+  font-family: var(--bl-font-sans);
+  line-height: 1.5;
+  resize: none;
+  margin: 10px 0;
+  transition: border-color var(--bl-duration-fast);
+}
+
+.br-confirm-note::placeholder {
+  color: var(--bl-text-muted);
+}
+
+.br-confirm-note:focus {
+  outline: none;
+  border-color: var(--bl-blue);
+  box-shadow: 0 0 0 1px var(--bl-blue);
+}
+
+.br-confirm-note::-webkit-scrollbar {
+  width: 6px;
+}
+
+.br-confirm-note::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.br-confirm-note::-webkit-scrollbar-thumb {
+  background: var(--bl-bg-hover);
+  border-radius: 3px;
 }
 
 .br-check {

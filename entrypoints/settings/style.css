@@ -113,7 +113,7 @@ textarea {
   color: var(--bl-text-primary);
   font-size: 13px;
   font-family: var(--bl-font-mono);
-  resize: vertical;
+  resize: none;
   line-height: 1.6;
   transition: border-color var(--bl-duration-fast) var(--bl-ease),
               box-shadow var(--bl-duration-fast) var(--bl-ease);
@@ -121,6 +121,23 @@ textarea {
 
 textarea::placeholder {
   color: var(--bl-text-muted);
+}
+
+textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: var(--bl-bg-hover);
+  border-radius: 3px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--bl-border-muted);
 }
 
 textarea:focus {

@@ -9,6 +9,7 @@ let uploadResult: { url: string; sha256: string; size: number } | null = null;
 let publishResult: { noteId: string; blossomUrl: string } | null = null;
 let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
+let pendingNoteContent: string | undefined;
 let recordingTabId: number | null = null;
 
 /** Find a web tab suitable for scripting.executeScript (not chrome://, chrome-extension://, etc.) */
@@ -208,10 +209,18 @@ export default defineBackground(() => {
           setState('recording');
           return false;
 
-        case MessageType.CAPTURE_ERROR:
-          console.error('[background] capture error:', (message as any).error);
-          setState('error');
+        case MessageType.CAPTURE_ERROR: {
+          const errMsg = (message as any).error || '';
+          console.error('[background] capture error:', errMsg);
+          // User canceled the screen picker — not a real error, just go back to idle
+          if (currentState === 'awaiting_media' || currentState === 'initializing') {
+            setState('idle');
+            closeOffscreenDocument().catch(console.error);
+          } else {
+            setState('error');
+          }
           return false;
+        }
 
         case MessageType.PAUSE_RECORDING: {
           browser.runtime.sendMessage({
@@ -299,6 +308,7 @@ export default defineBackground(() => {
               blossomUrl: msg.url,
               sha256: msg.sha256,
               size: msg.size,
+              noteContent: pendingNoteContent,
             }).catch(console.error);
           } else {
             // Skip Nostr publish — go straight to complete
@@ -385,6 +395,7 @@ export default defineBackground(() => {
         case MessageType.CONFIRM_UPLOAD: {
           const msg = message as any;
           pendingPublishToNostr = msg.publishToNostr !== false;
+          pendingNoteContent = msg.noteContent;
           setState('uploading');
           ensureOffscreenDocument()
             .then(() =>

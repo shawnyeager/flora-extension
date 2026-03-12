@@ -300,7 +300,12 @@ export default defineContentScript({
         videoEl.style.display = 'block';
         offEl.style.display = 'none';
         webcamOn = true;
+
+        // Show bubble with fade-in (prevents jarring pop in recording)
+        bubble.classList.remove('entering');
         bubble.style.display = 'block';
+        void bubble.offsetWidth;
+        bubble.classList.add('entering');
       } catch {
         webcamAcquiring = false;
         if (webcamAborted) return;
@@ -321,7 +326,7 @@ export default defineContentScript({
       const controls = ui.shadow.querySelector('.bloom-controls') as HTMLElement;
       const bubble = ui.shadow.querySelector('.bloom-webcam') as HTMLElement;
       if (controls) controls.style.display = 'none';
-      if (bubble) bubble.style.display = 'none';
+      if (bubble) { bubble.style.display = 'none'; bubble.classList.remove('entering'); }
       stopTimer();
       paused = false;
       pausedAccumulator = 0;
@@ -387,6 +392,7 @@ export default defineContentScript({
         <input class="br-confirm-server br-dest-input" type="text" spellcheck="false" aria-label="Blossom server URL">
       </div>
       <label class="br-check"><input type="checkbox" class="br-confirm-publish" checked> Publish to Nostr</label>
+      <textarea class="br-confirm-note" rows="3" placeholder="Say something about this recording\u2026" spellcheck="false" aria-label="Note text"></textarea>
       <div class="br-dest-row br-confirm-relay-row">
         <span class="br-dest-label">Relays</span>
         <span class="br-confirm-relays br-dest-value"></span>
@@ -499,10 +505,12 @@ export default defineContentScript({
         const btn = q('.br-btn-confirm') as HTMLButtonElement;
         btn.setAttribute('disabled', '');
         btn.textContent = 'Uploading\u2026';
+        const publishChecked = (q('.br-confirm-publish') as HTMLInputElement).checked;
         await browser.runtime.sendMessage({
           type: MessageType.CONFIRM_UPLOAD,
           serverOverride: (q('.br-confirm-server') as HTMLInputElement).value.trim() || undefined,
-          publishToNostr: (q('.br-confirm-publish') as HTMLInputElement).checked,
+          publishToNostr: publishChecked,
+          noteContent: publishChecked ? (q('.br-confirm-note') as HTMLTextAreaElement).value.trim() || undefined : undefined,
         });
       });
 
@@ -681,12 +689,15 @@ export default defineContentScript({
 
       const relayRow = panel.querySelector('.br-confirm-relay-row') as HTMLElement;
       const relaysEl = panel.querySelector('.br-confirm-relays') as HTMLElement;
-      const updateRelays = () => {
-        relayRow.style.display = publishCheck.checked && settings.relays?.length ? 'flex' : 'none';
+      const noteArea = panel.querySelector('.br-confirm-note') as HTMLTextAreaElement;
+      const updatePublishFields = () => {
+        const on = publishCheck.checked;
+        relayRow.style.display = on && settings.relays?.length ? 'flex' : 'none';
         relaysEl.textContent = settings.relays?.join(', ') || '';
+        noteArea.style.display = on ? 'block' : 'none';
       };
-      updateRelays();
-      publishCheck.onchange = updateRelays;
+      updatePublishFields();
+      publishCheck.onchange = updatePublishFields;
 
       renderSigner(
         nip07,
@@ -738,9 +749,14 @@ export default defineContentScript({
       } else if (state === 'complete') {
         showReviewView('br-complete');
         browser.runtime.sendMessage({ type: MessageType.GET_RESULT }).then((result) => {
+          const panel = ensureReviewPanel();
+          const published = result?.publishResult?.noteId;
+          const title = panel.querySelector('.br-complete-title') as HTMLElement;
+          title.textContent = published ? 'Shared successfully' : 'Uploaded';
+
           const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
           if (url) {
-            const link = ensureReviewPanel().querySelector('.br-result-link') as HTMLAnchorElement;
+            const link = panel.querySelector('.br-result-link') as HTMLAnchorElement;
             link.href = url;
             link.textContent = url;
             link.style.display = 'block';

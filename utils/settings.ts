@@ -7,7 +7,7 @@ export interface BloomSettings {
 const DEFAULTS: BloomSettings = {
   blossomServers: ['https://blossom.band'],
   nostrRelays: ['wss://relay.damus.io', 'wss://nos.lol'],
-  publishToNostr: true,
+  publishToNostr: false,
 };
 
 export async function getSettings(): Promise<BloomSettings> {

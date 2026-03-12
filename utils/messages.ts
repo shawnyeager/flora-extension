@@ -183,6 +183,7 @@ export interface PublishNoteMessage extends BaseMessage {
   blossomUrl: string;
   sha256: string;
   size: number;
+  noteContent?: string;
 }
 
 export interface PublishCompleteMessage extends BaseMessage {
@@ -217,6 +218,7 @@ export interface ConfirmUploadMessage extends BaseMessage {
   type: typeof MessageType.CONFIRM_UPLOAD;
   serverOverride?: string;
   publishToNostr: boolean;
+  noteContent?: string;
 }
 
 export interface BackToPreviewMessage extends BaseMessage {
