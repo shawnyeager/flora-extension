@@ -48,10 +48,20 @@ async function startCapture() {
       console.warn('[offscreen] mic not available, recording without mic:', err);
     }
 
-    // 3. Detect codecs
+    // 3. Detect codecs at actual capture resolution
+    const trackSettings = videoTrack.getSettings();
+    const captureWidth = trackSettings.width ?? 1920;
+    const captureHeight = trackSettings.height ?? 1080;
+
+    const BASE_BITRATES: Record<string, number> = {
+      av1: 4_000_000,   // 2x previous — screen content needs higher bitrate
+      vp9: 5_000_000,
+      avc: 8_000_000,
+    };
+
     const videoCodec = await getFirstEncodableVideoCodec(
       ['av1', 'vp9', 'avc'] as VideoCodec[],
-      { width: 1920, height: 1080, bitrate: 3_000_000 },
+      { width: captureWidth, height: captureHeight, bitrate: BASE_BITRATES.avc },
     );
     if (!videoCodec) throw new Error('No supported video codec found');
     console.log('[offscreen] selected video codec:', videoCodec);
@@ -62,18 +72,28 @@ async function startCapture() {
     );
     console.log('[offscreen] selected audio codec:', audioCodec);
 
-    // 4. Create video source (direct track, no compositing)
-    const bitrate = videoCodec === 'av1' ? 2_000_000 : videoCodec === 'vp9' ? 2_500_000 : 4_000_000;
+    // 4. Create video source with resolution-scaled bitrate
+    const BASE_PIXELS = 1920 * 1080;
+    const capturePixels = captureWidth * captureHeight;
+    const pixelRatio = capturePixels / BASE_PIXELS;
+    // Sub-linear scaling: 4K (~4x pixels) gets ~3x bitrate, not 4x
+    const bitrate = Math.round(BASE_BITRATES[videoCodec] * Math.pow(pixelRatio, 0.75));
+
+    console.log(`[offscreen] encoding: ${captureWidth}x${captureHeight} ${videoCodec} @ ${(bitrate / 1_000_000).toFixed(1)} Mbps`);
 
     videoSource = new MediaStreamVideoTrackSource(
       videoTrack as MediaStreamVideoTrack,
       {
         codec: videoCodec,
         bitrate,
+        bitrateMode: 'variable',
         latencyMode: 'realtime',
+        keyFrameInterval: 3,
+        hardwareAcceleration: 'prefer-hardware',
         contentHint: 'detail',
         sizeChangeBehavior: 'contain',
       },
+      { frameRate: 30 },
     );
     videoSource.errorPromise.catch((err) => {
       console.error('[offscreen] video source error:', err);
@@ -93,7 +113,7 @@ async function startCapture() {
 
       audioSource = new MediaStreamAudioTrackSource(
         mixedTrack as MediaStreamAudioTrack,
-        { codec: audioCodec, bitrate: 128_000 },
+        { codec: audioCodec, bitrate: 192_000 },
       );
       audioSource.errorPromise.catch((err) => {
         console.error('[offscreen] audio source error:', err);
