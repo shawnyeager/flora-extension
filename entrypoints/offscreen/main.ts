@@ -297,33 +297,6 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-async function migrateThumbnails() {
-  const key = 'bloom-thumb-v2';
-  if (localStorage.getItem(key)) return;
-
-  const db = await openDB();
-  const tx = db.transaction('recordings', 'readwrite');
-  const store = tx.objectStore('recordings');
-  const req = store.openCursor();
-  req.onsuccess = () => {
-    const cursor = req.result;
-    if (cursor) {
-      const rec = cursor.value;
-      if (rec.thumbnail) {
-        rec.thumbnail = undefined;
-        cursor.update(rec);
-      }
-      cursor.continue();
-    }
-  };
-  await new Promise<void>((resolve) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); resolve(); };
-  });
-  localStorage.setItem(key, '1');
-  console.log('[offscreen] cleared old thumbnails for regeneration');
-}
-
 async function getLatestRecording(): Promise<{ dataUrl: string; duration: number } | null> {
   const db = await openDB();
   const tx = db.transaction('recordings', 'readonly');
@@ -673,8 +646,6 @@ async function publishNote(blossomUrl: string, sha256: string, size: number, not
 }
 
 // Message handler
-migrateThumbnails();
-
 browser.runtime.onMessage.addListener(
   (message: Message, _sender, sendResponse) => {
     if (message.target !== 'offscreen') return false;

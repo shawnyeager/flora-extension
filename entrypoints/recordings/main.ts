@@ -236,10 +236,10 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
     });
   }
 
-  // Play icon overlay
+  // Play button overlay
   const playIcon = document.createElement('div');
   playIcon.className = 'rec-play';
-  playIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="8 5 20 12 8 19"/></svg>';
+  playIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="9 5 21 12 9 19"/></svg>';
   thumb.append(playIcon);
 
   // Duration overlay

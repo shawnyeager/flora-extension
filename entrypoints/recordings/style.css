@@ -159,7 +159,7 @@ body {
   height: 32px;
 }
 
-/* Play icon — centered, visible on hover */
+/* Play button — frosted circle with brand tint */
 
 .rec-play {
   position: absolute;
@@ -168,22 +168,70 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 2;
-  opacity: 0;
-  transition: opacity var(--bl-duration-fast);
   pointer-events: none;
 }
 
-.rec-play svg {
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+.rec-play::before {
+  content: '';
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  position: absolute;
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1),
+              background 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
+.rec-play svg {
+  position: relative;
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  margin-left: 2px; /* optical centering — triangle sits left-heavy */
+}
+
+/* Subtle at rest so users know it's playable */
+.rec-play {
+  opacity: 0.6;
+  transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Bright on hover with bloom pink backdrop */
 .rec-card:hover .rec-play {
   opacity: 1;
 }
 
-/* In selection mode: hide play icon */
+.rec-card:hover .rec-play::before {
+  background: var(--bl-pink);
+  transform: scale(1.08);
+}
+
+.rec-card:hover .rec-play svg {
+  transform: scale(1.05);
+}
+
+/* Pressed state */
+.rec-thumb:active .rec-play::before {
+  transform: scale(0.95);
+  transition-duration: 0.08s;
+}
+
+/* In selection mode: hide play button */
 .grid.selecting .rec-play {
   opacity: 0 !important;
+}
+
+/* Hero card gets a bigger play button */
+.rec-card.hero .rec-play::before {
+  width: 56px;
+  height: 56px;
+}
+
+.rec-card.hero .rec-play svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* Hover scrim on thumbnail */
