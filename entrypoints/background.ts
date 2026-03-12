@@ -314,11 +314,23 @@ export default defineBackground(() => {
 
         case MessageType.TOGGLE_WEBCAM: {
           controlsState.webcamOn = !!(message as any).enabled;
+          const webcamMsg = { type: MessageType.TOGGLE_WEBCAM, enabled: (message as any).enabled };
           if (recordingTabId) {
-            browser.tabs.sendMessage(recordingTabId, {
-              type: MessageType.TOGGLE_WEBCAM,
-              enabled: (message as any).enabled,
-            }).catch(console.error);
+            browser.tabs.sendMessage(recordingTabId, webcamMsg).catch(() => {
+              // Tab may have navigated — broadcast to all tabs
+              browser.tabs.query({}).then((tabs) => {
+                for (const tab of tabs) {
+                  if (tab.id) browser.tabs.sendMessage(tab.id, webcamMsg).catch(() => {});
+                }
+              });
+            });
+          } else {
+            // No recording tab — broadcast to all tabs
+            browser.tabs.query({}).then((tabs) => {
+              for (const tab of tabs) {
+                if (tab.id) browser.tabs.sendMessage(tab.id, webcamMsg).catch(() => {});
+              }
+            });
           }
           sendResponse({ ok: true });
           return false;
@@ -446,15 +458,25 @@ export default defineBackground(() => {
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          // Return settings + recording metadata (NIP-07 probing done by content script directly)
-          getSettings()
-            .then((settings) => {
+          // Return settings + recording metadata + signer status
+          Promise.all([
+            getSettings(),
+            findScriptableTab().then((tabId) =>
+              tabId ? probeNip07Direct(tabId) : { error: 'No web tab available' },
+            ).catch((err) => ({ error: err.message })),
+          ])
+            .then(([settings, signerResult]) => {
+              const npub = 'pubkey' in signerResult ? signerResult.pubkey : null;
+              const bridgeError = 'error' in signerResult ? signerResult.error : null;
               sendResponse({
                 server: settings.blossomServers[0] || 'https://blossom.band',
                 relays: settings.nostrRelays,
                 publishToNostr: settings.publishToNostr,
                 fileSize: lastRecordingMeta?.size ?? 0,
                 duration: lastRecordingMeta?.duration ?? 0,
+                npub,
+                signerAvailable: !!npub,
+                bridgeError,
               });
             })
             .catch((err) => {
