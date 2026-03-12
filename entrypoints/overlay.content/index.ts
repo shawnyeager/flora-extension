@@ -75,11 +75,14 @@ export default defineContentScript({
         // --- Webcam bubble ---
         const webcamBubble = document.createElement('div');
         webcamBubble.className = 'bloom-webcam pos-bl';
+        webcamBubble.setAttribute('role', 'region');
+        webcamBubble.setAttribute('aria-label', 'Webcam preview');
 
         const webcamVideoEl = document.createElement('video');
         webcamVideoEl.autoplay = true;
         webcamVideoEl.muted = true;
         webcamVideoEl.playsInline = true;
+        webcamVideoEl.setAttribute('aria-hidden', 'true');
 
         const webcamOff = document.createElement('div');
         webcamOff.className = 'bloom-webcam-off';
@@ -89,7 +92,7 @@ export default defineContentScript({
         const camToggle = document.createElement('button');
         camToggle.className = 'bloom-webcam-toggle';
         camToggle.innerHTML = Icons.cameraOff;
-        camToggle.title = 'Turn camera off';
+        camToggle.setAttribute('aria-label', 'Toggle camera');
 
         camToggle.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -97,14 +100,14 @@ export default defineContentScript({
           if (!webcamOn) {
             webcamBubble.style.display = 'none';
             const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
-            if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); }
+            if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
             webcamVideoEl.style.display = 'block';
             webcamOff.style.display = 'none';
             webcamBubble.style.display = 'block';
             const camBtn = ui.shadow.querySelector('.bloom-btn-cam') as HTMLElement;
-            if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); }
+            if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
           }
         });
@@ -159,34 +162,40 @@ export default defineContentScript({
         // --- Controls bar ---
         const controls = document.createElement('div');
         controls.className = 'bloom-controls';
+        controls.setAttribute('role', 'toolbar');
+        controls.setAttribute('aria-label', 'Recording controls');
 
         const recDot = document.createElement('div');
         recDot.className = 'bloom-rec-dot';
+        recDot.setAttribute('aria-hidden', 'true');
 
         const timer = document.createElement('span');
         timer.className = 'bloom-timer';
         timer.textContent = '00:00';
+        timer.setAttribute('aria-live', 'off');
+        timer.setAttribute('aria-label', 'Recording duration');
 
         const divider = document.createElement('div');
         divider.className = 'bloom-divider';
+        divider.setAttribute('aria-hidden', 'true');
 
         const pauseBtn = document.createElement('button');
         pauseBtn.className = 'bloom-btn-icon bloom-btn-pause';
         pauseBtn.innerHTML = Icons.pause;
-        pauseBtn.title = 'Pause recording';
+        pauseBtn.setAttribute('aria-label', 'Pause recording');
         pauseBtn.addEventListener('click', () => {
           paused = !paused;
           if (paused) {
             pauseTimestamp = Date.now();
             pauseBtn.innerHTML = Icons.play;
-            pauseBtn.title = 'Resume recording';
+            pauseBtn.setAttribute('aria-label', 'Resume recording');
             pauseBtn.classList.add('active');
             recDot.classList.add('paused');
             browser.runtime.sendMessage({ type: MessageType.PAUSE_RECORDING });
           } else {
             pausedAccumulator += Date.now() - pauseTimestamp;
             pauseBtn.innerHTML = Icons.pause;
-            pauseBtn.title = 'Pause recording';
+            pauseBtn.setAttribute('aria-label', 'Pause recording');
             pauseBtn.classList.remove('active');
             recDot.classList.remove('paused');
             browser.runtime.sendMessage({ type: MessageType.RESUME_RECORDING });
@@ -196,25 +205,26 @@ export default defineContentScript({
         const micBtn = document.createElement('button');
         micBtn.className = 'bloom-btn-icon';
         micBtn.innerHTML = Icons.mic;
-        micBtn.title = 'Mute microphone';
+        micBtn.setAttribute('aria-label', 'Mute microphone');
         micBtn.addEventListener('click', () => {
           micMuted = !micMuted;
           micBtn.innerHTML = micMuted ? Icons.micOff : Icons.mic;
           micBtn.classList.toggle('active', micMuted);
-          micBtn.title = micMuted ? 'Unmute microphone' : 'Mute microphone';
+          micBtn.setAttribute('aria-label', micMuted ? 'Unmute microphone' : 'Mute microphone');
           browser.runtime.sendMessage({ type: MessageType.TOGGLE_MIC, muted: micMuted });
         });
 
         const camBtn = document.createElement('button');
         camBtn.className = 'bloom-btn-icon bloom-btn-cam';
         camBtn.innerHTML = Icons.camera;
-        camBtn.title = 'Turn camera off';
+        camBtn.setAttribute('aria-label', 'Turn camera off');
         camBtn.addEventListener('click', () => {
           webcamOn = !webcamOn;
           if (!webcamOn) {
             webcamBubble.style.display = 'none';
             camBtn.innerHTML = Icons.cameraOff;
             camBtn.classList.add('active');
+            camBtn.setAttribute('aria-label', 'Turn camera on');
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
             webcamVideoEl.style.display = 'block';
@@ -222,6 +232,7 @@ export default defineContentScript({
             webcamBubble.style.display = 'block';
             camBtn.innerHTML = Icons.camera;
             camBtn.classList.remove('active');
+            camBtn.setAttribute('aria-label', 'Turn camera off');
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
           }
         });
@@ -229,7 +240,7 @@ export default defineContentScript({
         const stopBtn = document.createElement('button');
         stopBtn.className = 'bloom-btn-stop';
         stopBtn.innerHTML = Icons.stop;
-        stopBtn.title = 'Stop recording';
+        stopBtn.setAttribute('aria-label', 'Stop recording');
         stopBtn.addEventListener('click', () => {
           stopEverything();
           browser.runtime.sendMessage({ type: MessageType.STOP_RECORDING });
@@ -262,7 +273,7 @@ export default defineContentScript({
         const s = Math.floor(elapsed % 60).toString().padStart(2, '0');
         const timerEl = ui.shadow.querySelector('.bloom-timer') as HTMLElement;
         if (timerEl) timerEl.textContent = `${m}:${s}`;
-      }, 500);
+      }, 1000);
     }
 
     function stopTimer() {
@@ -289,7 +300,6 @@ export default defineContentScript({
         videoEl.style.display = 'block';
         offEl.style.display = 'none';
         webcamOn = true;
-        bubble.classList.remove('collapsed');
         bubble.style.display = 'block';
       } catch {
         webcamAcquiring = false;
@@ -297,8 +307,7 @@ export default defineContentScript({
         videoEl.style.display = 'none';
         offEl.style.display = 'flex';
         webcamOn = false;
-        bubble.classList.add('collapsed');
-        bubble.style.display = 'block';
+        bubble.style.display = 'none';
       }
     }
 
@@ -329,16 +338,16 @@ export default defineContentScript({
 
       const panel = document.createElement('div');
       panel.className = 'bloom-review';
-      panel.style.display = 'none';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-label', 'Recording review');
       panel.innerHTML = `
 <div class="br-backdrop"></div>
 <div class="br-panel">
+  <button class="br-close" aria-label="Close">${Icons.x}</button>
   <div class="br-header">
-    <div class="br-header-left">
-      <span class="br-logo">${Icons.camera}</span>
-      <span class="br-title">Bloom</span>
-    </div>
-    <a class="br-settings">${Icons.stop.replace('14', '12')} Settings</a>
+    <span class="br-logo">${Icons.camera}</span>
+    <span class="br-title">Bloom</span>
   </div>
 
   <div class="br-video-wrap">
@@ -360,13 +369,13 @@ export default defineContentScript({
         <span class="br-dest-label">Identity</span>
         <span class="br-identity br-dest-value"></span>
       </div>
-      <div class="br-warning"></div>
+      <div class="br-warning" role="alert"></div>
     </div>
     <div class="br-actions">
-      <button class="br-btn-primary br-btn-upload">Upload & Share</button>
+      <button class="br-btn-primary br-btn-icon br-btn-upload">${Icons.upload} Upload &amp; Share</button>
       <div class="br-actions-row">
-        <button class="br-btn-secondary br-btn-download">Download MP4</button>
-        <button class="br-btn-ghost br-btn-discard">Discard</button>
+        <button class="br-btn-secondary br-btn-icon br-btn-download">${Icons.download} Download</button>
+        <button class="br-btn-ghost br-btn-icon br-btn-discard">${Icons.trash} Discard</button>
       </div>
     </div>
   </div>
@@ -375,7 +384,7 @@ export default defineContentScript({
     <div class="br-dest br-dest-edit">
       <div class="br-dest-row">
         <span class="br-dest-label">Server</span>
-        <input class="br-confirm-server br-dest-input" type="text" spellcheck="false">
+        <input class="br-confirm-server br-dest-input" type="text" spellcheck="false" aria-label="Blossom server URL">
       </div>
       <label class="br-check"><input type="checkbox" class="br-confirm-publish" checked> Publish to Nostr</label>
       <div class="br-dest-row br-confirm-relay-row">
@@ -386,29 +395,29 @@ export default defineContentScript({
         <span class="br-dest-label">Identity</span>
         <span class="br-confirm-identity br-dest-value"></span>
       </div>
-      <div class="br-confirm-warning"></div>
+      <div class="br-confirm-warning" role="alert"></div>
     </div>
     <div class="br-actions">
-      <button class="br-btn-primary br-btn-confirm">Confirm Upload</button>
+      <button class="br-btn-primary br-btn-icon br-btn-confirm">${Icons.upload} Confirm Upload</button>
       <button class="br-btn-ghost br-btn-back">Back</button>
     </div>
   </div>
 
   <div class="br-view br-progress" style="display:none">
     <div class="br-center-section">
-      <div class="br-progress-status"></div>
-      <div class="br-progress-track"><div class="br-progress-fill"></div></div>
-      <div class="br-progress-detail"></div>
+      <div class="br-progress-status" aria-live="polite"></div>
+      <div class="br-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="br-progress-fill"></div></div>
+      <div class="br-progress-detail" aria-live="polite"></div>
     </div>
   </div>
 
   <div class="br-view br-complete" style="display:none">
     <div class="br-center-section">
-      <div class="br-complete-icon">\u2713</div>
+      <div class="br-complete-icon">${Icons.check}</div>
       <div class="br-complete-title">Shared successfully</div>
       <a class="br-result-link" target="_blank"></a>
       <div class="br-actions">
-        <button class="br-btn-primary br-btn-copy">Copy Link</button>
+        <button class="br-btn-primary br-btn-icon br-btn-copy">${Icons.copy} Copy Link</button>
         <button class="br-btn-ghost br-btn-new">New Recording</button>
       </div>
     </div>
@@ -416,8 +425,9 @@ export default defineContentScript({
 
   <div class="br-view br-error" style="display:none">
     <div class="br-center-section">
+      <div class="br-error-icon">${Icons.alertCircle}</div>
       <div class="br-error-title">Upload Failed</div>
-      <div class="br-error-message"></div>
+      <div class="br-error-message" role="alert"></div>
       <div class="br-actions">
         <button class="br-btn-primary br-btn-retry">Retry</button>
         <button class="br-btn-ghost br-btn-error-discard">Discard</button>
@@ -429,9 +439,32 @@ export default defineContentScript({
       // --- Wire events ---
       const q = (sel: string) => panel.querySelector(sel) as HTMLElement;
 
-      q('.br-settings').addEventListener('click', (e) => {
-        e.preventDefault();
-        browser.runtime.sendMessage({ type: 'open_settings' });
+      // Escape key to close/go back
+      panel.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        const confirmView = q('.br-confirm');
+        if (confirmView && confirmView.style.display !== 'none') {
+          browser.runtime.sendMessage({ type: MessageType.BACK_TO_PREVIEW });
+        } else {
+          const previewView = q('.br-preview');
+          if (previewView && previewView.style.display !== 'none') {
+            browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
+          }
+        }
+      });
+
+      // Close button
+      q('.br-close').addEventListener('click', () => {
+        browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
+      });
+
+      // Backdrop click to close (only on preview)
+      q('.br-backdrop').addEventListener('click', () => {
+        const previewView = q('.br-preview');
+        if (previewView && previewView.style.display !== 'none') {
+          browser.runtime.sendMessage({ type: MessageType.RESET_STATE });
+        }
       });
 
       q('.br-btn-upload').addEventListener('click', () => {
@@ -440,7 +473,7 @@ export default defineContentScript({
 
       q('.br-btn-download').addEventListener('click', async () => {
         const btn = q('.br-btn-download') as HTMLButtonElement;
-        btn.textContent = 'Preparing\u2026';
+        btn.innerHTML = 'Preparing\u2026';
         btn.setAttribute('disabled', '');
         try {
           const result = await browser.runtime.sendMessage({ type: MessageType.GET_RECORDING });
@@ -451,7 +484,7 @@ export default defineContentScript({
             a.click();
           }
         } finally {
-          btn.textContent = 'Download MP4';
+          btn.innerHTML = `${Icons.download} Download`;
           btn.removeAttribute('disabled');
         }
       });
@@ -483,8 +516,9 @@ export default defineContentScript({
         if (url) {
           await navigator.clipboard.writeText(url);
           const btn = q('.br-btn-copy');
-          btn.textContent = 'Copied!';
-          setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000);
+          const original = btn.innerHTML;
+          btn.innerHTML = `${Icons.check} Copied!`;
+          setTimeout(() => { btn.innerHTML = original; }, 2000);
         }
       });
 
@@ -531,19 +565,33 @@ export default defineContentScript({
     function showReviewView(cls: string) {
       const panel = ensureReviewPanel();
       panel.style.display = 'block';
+      // Trigger entrance animation
+      requestAnimationFrame(() => {
+        panel.classList.add('visible');
+      });
       panel.querySelectorAll('.br-view').forEach((v) => ((v as HTMLElement).style.display = 'none'));
       const target = panel.querySelector(`.${cls}`) as HTMLElement;
       if (target) target.style.display = 'flex';
 
       const showMedia = cls === 'br-preview' || cls === 'br-confirm';
-      const video = panel.querySelector('.br-video') as HTMLElement;
-      const meta = panel.querySelector('.br-meta') as HTMLElement;
-      if (video) video.style.display = showMedia ? 'block' : 'none';
-      if (meta) meta.style.display = showMedia ? 'block' : 'none';
+      const videoWrap = panel.querySelector('.br-video-wrap') as HTMLElement;
+      if (videoWrap) videoWrap.style.display = showMedia ? 'block' : 'none';
+
+      // Show/hide close button based on view
+      const closeBtn = panel.querySelector('.br-close') as HTMLElement;
+      const canClose = cls === 'br-preview' || cls === 'br-complete';
+      if (closeBtn) closeBtn.style.display = canClose ? 'flex' : 'none';
     }
 
     function hideReview() {
-      if (reviewPanel) reviewPanel.style.display = 'none';
+      if (!reviewPanel) return;
+      reviewPanel.classList.remove('visible');
+      // Wait for fade out animation
+      setTimeout(() => {
+        if (reviewPanel && !reviewPanel.classList.contains('visible')) {
+          reviewPanel.style.display = 'none';
+        }
+      }, 250);
     }
 
     function renderSigner(
@@ -557,7 +605,7 @@ export default defineContentScript({
         identityEl.textContent = fmtKey(nip07.pubkey);
         actionBtn.removeAttribute('disabled');
       } else {
-        identityEl.textContent = '';
+        identityEl.textContent = '\u2014';
         const errMsg = 'error' in nip07 ? nip07.error : 'Unknown error';
         warningEl.innerHTML = '';
 
@@ -648,7 +696,9 @@ export default defineContentScript({
       );
 
       confirmLocked = false;
-      (panel.querySelector('.br-btn-confirm') as HTMLButtonElement).textContent = 'Confirm Upload';
+      const confirmBtn = panel.querySelector('.br-btn-confirm') as HTMLButtonElement;
+      confirmBtn.innerHTML = `${Icons.upload} Confirm Upload`;
+      confirmBtn.removeAttribute('disabled');
     }
 
     // ==========================================
@@ -673,13 +723,18 @@ export default defineContentScript({
         showReviewView('br-progress');
         const panel = ensureReviewPanel();
         (panel.querySelector('.br-progress-status') as HTMLElement).textContent = 'Uploading\u2026';
-        (panel.querySelector('.br-progress-fill') as HTMLElement).style.width = '0%';
+        const fill = panel.querySelector('.br-progress-fill') as HTMLElement;
+        fill.style.width = '0%';
+        const track = panel.querySelector('.br-progress-track') as HTMLElement;
+        track.setAttribute('aria-valuenow', '0');
         (panel.querySelector('.br-progress-detail') as HTMLElement).textContent = '';
       } else if (state === 'publishing') {
         showReviewView('br-progress');
         const panel = ensureReviewPanel();
         (panel.querySelector('.br-progress-status') as HTMLElement).textContent = 'Publishing to Nostr\u2026';
         (panel.querySelector('.br-progress-fill') as HTMLElement).style.width = '100%';
+        const track = panel.querySelector('.br-progress-track') as HTMLElement;
+        track.setAttribute('aria-valuenow', '100');
       } else if (state === 'complete') {
         showReviewView('br-complete');
         browser.runtime.sendMessage({ type: MessageType.GET_RESULT }).then((result) => {
@@ -716,6 +771,8 @@ export default defineContentScript({
         const pct = Math.round((message.bytesUploaded / message.totalBytes) * 100);
         const panel = ensureReviewPanel();
         (panel.querySelector('.br-progress-fill') as HTMLElement).style.width = `${pct}%`;
+        const track = panel.querySelector('.br-progress-track') as HTMLElement;
+        track.setAttribute('aria-valuenow', String(pct));
         (panel.querySelector('.br-progress-detail') as HTMLElement).textContent =
           `${fmtBytes(message.bytesUploaded)} / ${fmtBytes(message.totalBytes)} to ${message.serverName}`;
         return false;

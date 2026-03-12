@@ -4,10 +4,27 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bl-bg-base: #111114;
+  --bl-bg-raised: #18181c;
+  --bl-bg-muted: rgba(255, 255, 255, 0.06);
+  --bl-bg-hover: rgba(255, 255, 255, 0.1);
+  --bl-border-subtle: rgba(255, 255, 255, 0.06);
+  --bl-border-muted: rgba(255, 255, 255, 0.1);
+  --bl-text-primary: #f0f0f2;
+  --bl-text-secondary: #9ca3af;
+  --bl-text-muted: #6b7280;
+  --bl-blue: #60a5fa;
+  --bl-blue-hover: #3b82f6;
+  --bl-green: #4ade80;
+  --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --bl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+}
+
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #0f0f0f;
-  color: #e8e8e8;
+  font-family: var(--bl-font-sans);
+  background: var(--bl-bg-base);
+  color: var(--bl-text-primary);
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -29,9 +46,11 @@ h1 {
 }
 
 h2 {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #a0aec0;
+  color: var(--bl-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   margin-bottom: 8px;
 }
 
@@ -43,24 +62,25 @@ section {
 
 .hint {
   font-size: 12px;
-  color: #718096;
+  color: var(--bl-text-muted);
 }
 
 textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #444;
+  border: 1px solid var(--bl-border-muted);
   border-radius: 6px;
-  background: #1a1a2e;
-  color: #e8e8e8;
+  background: var(--bl-bg-raised);
+  color: var(--bl-text-primary);
   font-size: 13px;
-  font-family: monospace;
+  font-family: var(--bl-font-mono);
   resize: vertical;
+  transition: border-color 0.15s;
 }
 
 textarea:focus {
   outline: none;
-  border-color: #63b3ed;
+  border-color: var(--bl-blue);
 }
 
 .toggle-label {
@@ -72,19 +92,19 @@ textarea:focus {
 }
 
 .toggle-label input[type="checkbox"] {
-  accent-color: #63b3ed;
+  accent-color: var(--bl-blue);
   width: 16px;
   height: 16px;
 }
 
 .identity-display {
   font-size: 13px;
-  font-family: monospace;
-  color: #a0aec0;
+  font-family: var(--bl-font-mono);
+  color: var(--bl-text-secondary);
   padding: 8px 10px;
-  border: 1px solid #333;
+  border: 1px solid var(--bl-border-subtle);
   border-radius: 6px;
-  background: #1a1a2e;
+  background: var(--bl-bg-raised);
   word-break: break-all;
 }
 
@@ -98,19 +118,25 @@ textarea:focus {
   padding: 10px 24px;
   border: none;
   border-radius: 8px;
-  background: #63b3ed;
-  color: #0f0f0f;
+  background: var(--bl-blue);
+  color: var(--bl-bg-base);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
+  font-family: var(--bl-font-sans);
 }
 
 .btn-save:hover {
-  background: #4299e1;
+  background: var(--bl-blue-hover);
+}
+
+.btn-save:focus-visible {
+  outline: 2px solid var(--bl-blue);
+  outline-offset: 2px;
 }
 
 .save-status {
   font-size: 13px;
-  color: #68d391;
+  color: var(--bl-green);
 }

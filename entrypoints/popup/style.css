@@ -4,75 +4,161 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bl-bg-base: #111114;
+  --bl-bg-raised: #18181c;
+  --bl-bg-muted: rgba(255, 255, 255, 0.06);
+  --bl-bg-hover: rgba(255, 255, 255, 0.1);
+  --bl-border-subtle: rgba(255, 255, 255, 0.06);
+  --bl-text-primary: #f0f0f2;
+  --bl-text-secondary: #9ca3af;
+  --bl-text-muted: #6b7280;
+  --bl-red: #ef4444;
+  --bl-red-hover: #dc2626;
+  --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --bl-radius-md: 10px;
+}
+
 body {
-  width: 320px;
-  min-height: 200px;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #0f0f0f;
-  color: #e8e8e8;
+  width: 300px;
+  font-family: var(--bl-font-sans);
+  background: var(--bl-bg-base);
+  color: var(--bl-text-primary);
 }
 
 #app {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 24px 16px;
+  padding: 20px;
   gap: 16px;
 }
 
-.logo {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.header-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Status */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bl-bg-muted);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--bl-text-secondary);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bl-text-muted);
+  flex-shrink: 0;
+}
+
+.status-dot.recording {
+  background: var(--bl-red);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot.active {
+  background: #4ade80;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-text {
+  flex: 1;
+}
+
+/* Buttons */
 .btn-record {
   width: 100%;
-  padding: 12px;
+  padding: 11px;
   border: none;
-  border-radius: 8px;
-  background: #e53e3e;
+  border-radius: var(--bl-radius-md);
+  background: var(--bl-red);
   color: white;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.1s;
+  font-family: var(--bl-font-sans);
 }
 
-.btn-record:hover {
-  background: #c53030;
+.btn-record:hover { background: var(--bl-red-hover); }
+.btn-record:active { transform: scale(0.98); }
+.btn-record:focus-visible {
+  outline: 2px solid var(--bl-red);
+  outline-offset: 2px;
 }
 
-.btn-stop {
+.btn-stop,
+.btn-open {
   width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #2d3748;
-  color: white;
-  font-size: 15px;
+  padding: 11px;
+  border: 1px solid var(--bl-border-subtle);
+  border-radius: var(--bl-radius-md);
+  background: var(--bl-bg-muted);
+  color: var(--bl-text-primary);
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
+  font-family: var(--bl-font-sans);
 }
 
-.btn-stop:hover {
-  background: #4a5568;
+.btn-stop:hover,
+.btn-open:hover {
+  background: var(--bl-bg-hover);
 }
 
-.status {
-  font-size: 13px;
-  color: #888;
+.btn-stop:focus-visible,
+.btn-open:focus-visible {
+  outline: 2px solid var(--bl-red);
+  outline-offset: 2px;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: center;
 }
 
 .settings-link {
   font-size: 12px;
-  color: #718096;
+  color: var(--bl-text-muted);
   text-decoration: none;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
 }
 
 .settings-link:hover {
-  color: #a0aec0;
-  text-decoration: underline;
+  color: var(--bl-text-secondary);
+  background: var(--bl-bg-muted);
+}
+
+.settings-link:focus-visible {
+  outline: 2px solid var(--bl-red);
+  outline-offset: 2px;
 }
