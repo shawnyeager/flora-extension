@@ -301,7 +301,7 @@ async function storeRecording(buffer: ArrayBuffer, duration: number) {
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('bloom-recordings', 2);
+    const req = indexedDB.open('bloom-recordings', 2); // legacy name — do not rename (data loss)
     req.onupgradeneeded = (event) => {
       const db = req.result;
       let store: IDBObjectStore;

@@ -7,16 +7,16 @@
 }
 
 body {
-  font-family: var(--bl-font-sans);
-  background: var(--bl-bg-base);
-  color: var(--bl-text-primary);
+  font-family: var(--fl-font-sans);
+  background: var(--fl-bg-base);
+  color: var(--fl-text-primary);
   min-height: 100vh;
   padding: 48px 24px 100px;
   line-height: 1.5;
 }
 
 .container {
-  max-width: var(--bl-container-width);
+  max-width: var(--fl-container-width);
   margin: 0 auto;
 }
 
@@ -38,7 +38,7 @@ body {
 .header-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   letter-spacing: -0.01em;
 }
 
@@ -46,8 +46,8 @@ body {
   margin-left: auto;
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
-  background: var(--bl-bg-muted);
+  color: var(--fl-text-muted);
+  background: var(--fl-bg-muted);
   padding: 2px 8px;
   border-radius: 9999px;
   font-variant-numeric: tabular-nums;
@@ -63,10 +63,10 @@ body {
   gap: 8px;
   padding: 10px 14px;
   margin-bottom: 20px;
-  background: var(--bl-bg-muted);
-  border-radius: var(--bl-radius-sm);
+  background: var(--fl-bg-muted);
+  border-radius: var(--fl-radius-sm);
   font-size: 13px;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
 }
 
 .notice[hidden] { display: none; }
@@ -75,17 +75,17 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--bl-text-muted);
+  background: var(--fl-text-muted);
   flex-shrink: 0;
 }
 
 .notice-dot.recording {
-  background: var(--bl-accent);
+  background: var(--fl-accent);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.notice-dot.active { background: var(--bl-green); }
-.notice-dot.error { background: var(--bl-red); }
+.notice-dot.active { background: var(--fl-green); }
+.notice-dot.error { background: var(--fl-red); }
 
 /* --- Grid --- */
 
@@ -101,7 +101,7 @@ body {
   grid-column: 1 / -1;
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 0 2px;
@@ -117,7 +117,7 @@ body {
   position: relative;
   opacity: 0;
   transform: translateY(8px);
-  animation: card-in 0.4s var(--bl-ease) forwards;
+  animation: card-in 0.4s var(--fl-ease) forwards;
   animation-delay: calc(min(var(--i, 0), 12) * 40ms);
 }
 
@@ -132,7 +132,7 @@ body {
   position: relative;
   aspect-ratio: 16 / 9;
   background: #16161a;
-  border-radius: var(--bl-radius-md);
+  border-radius: var(--fl-radius-md);
   overflow: hidden;
   cursor: pointer;
 }
@@ -199,13 +199,13 @@ body {
   transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Bright on hover with bloom pink backdrop */
+/* Bright on hover with flora pink backdrop */
 .rec-card:hover .rec-play {
   opacity: 1;
 }
 
 .rec-card:hover .rec-play::before {
-  background: var(--bl-accent);
+  background: var(--fl-accent);
   transform: scale(1.08);
 }
 
@@ -242,9 +242,9 @@ body {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0);
-  transition: background var(--bl-duration-fast);
+  transition: background var(--fl-duration-fast);
   pointer-events: none;
-  border-radius: var(--bl-radius-md);
+  border-radius: var(--fl-radius-md);
 }
 
 .rec-card:hover .rec-thumb::after {
@@ -258,7 +258,7 @@ body {
   bottom: 6px;
   right: 6px;
   background: rgba(0, 0, 0, 0.7);
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   font-size: 11px;
   font-weight: 600;
   padding: 1px 5px;
@@ -286,13 +286,13 @@ body {
 /* Uploaded to Blossom only — subtle, informational */
 .rec-badge-uploaded {
   background: rgba(126, 200, 227, 0.15);
-  color: var(--bl-cyan);
+  color: var(--fl-cyan);
 }
 
 /* Posted to Nostr — stronger, it's out there */
 .rec-badge-posted {
   background: rgba(155, 110, 199, 0.2);
-  color: var(--bl-violet);
+  color: var(--fl-violet);
 }
 
 /* --- Checkbox (Google Photos pattern) --- */
@@ -308,7 +308,7 @@ body {
   background: rgba(0, 0, 0, 0.35);
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--bl-duration-fast), background var(--bl-duration-fast), border-color var(--bl-duration-fast), transform 0.1s var(--bl-ease);
+  transition: opacity var(--fl-duration-fast), background var(--fl-duration-fast), border-color var(--fl-duration-fast), transform 0.1s var(--fl-ease);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -337,8 +337,8 @@ body {
 
 /* Checked state */
 .rec-check.checked {
-  background: var(--bl-violet);
-  border-color: var(--bl-violet);
+  background: var(--fl-violet);
+  border-color: var(--fl-violet);
   opacity: 1;
 }
 
@@ -352,7 +352,7 @@ body {
 
 /* Selected card — violet ring */
 .rec-card.selected .rec-thumb {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: -2px;
 }
 
@@ -364,7 +364,7 @@ body {
   gap: 6px;
   padding: 7px 2px 0;
   font-size: 12px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   min-height: 28px;
 }
 
@@ -388,7 +388,7 @@ body {
   gap: 1px;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity var(--bl-duration-fast);
+  transition: opacity var(--fl-duration-fast);
 }
 
 .rec-card:hover .rec-actions {
@@ -397,13 +397,13 @@ body {
 
 .rec-btn {
   border: none;
-  font-family: var(--bl-font-sans);
+  font-family: var(--fl-font-sans);
   cursor: pointer;
-  transition: background var(--bl-duration-fast), color var(--bl-duration-fast), opacity var(--bl-duration-fast);
+  transition: background var(--fl-duration-fast), color var(--fl-duration-fast), opacity var(--fl-duration-fast);
 }
 
 .rec-btn:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
 }
 
@@ -418,12 +418,12 @@ body {
   font-size: 11px;
   font-weight: 500;
   background: transparent;
-  color: var(--bl-cyan);
+  color: var(--fl-cyan);
   white-space: nowrap;
 }
 
 .rec-btn-text:hover:not(:disabled) {
-  background: var(--bl-cyan-subtle);
+  background: var(--fl-cyan-subtle);
 }
 
 .rec-btn-icon {
@@ -434,18 +434,18 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   border-radius: 4px;
 }
 
 .rec-btn-icon:hover {
-  background: var(--bl-bg-hover);
-  color: var(--bl-text-secondary);
+  background: var(--fl-bg-hover);
+  color: var(--fl-text-secondary);
 }
 
 .rec-btn-icon.danger:hover {
-  background: var(--bl-red-subtle);
-  color: var(--bl-red);
+  background: var(--fl-red-subtle);
+  color: var(--fl-red);
 }
 
 .rec-btn-icon svg {
@@ -468,7 +468,7 @@ body {
   align-items: center;
   gap: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  transition: transform 0.3s var(--bl-ease), opacity 0.3s var(--bl-ease);
+  transition: transform 0.3s var(--fl-ease), opacity 0.3s var(--fl-ease);
   opacity: 0;
   pointer-events: none;
   z-index: 100;
@@ -483,41 +483,41 @@ body {
 .bulk-count {
   font-size: 13px;
   font-weight: 600;
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   padding: 0 4px;
 }
 
 .bulk-delete {
   padding: 7px 16px;
   border: none;
-  border-radius: var(--bl-radius-sm);
-  background: var(--bl-red);
+  border-radius: var(--fl-radius-sm);
+  background: var(--fl-red);
   color: white;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--bl-font-sans);
-  transition: background var(--bl-duration-fast);
+  font-family: var(--fl-font-sans);
+  transition: background var(--fl-duration-fast);
 }
 
-.bulk-delete:hover { background: var(--bl-red-hover); }
+.bulk-delete:hover { background: var(--fl-red-hover); }
 
 .bulk-cancel {
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   background: transparent;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  font-family: var(--bl-font-sans);
-  transition: background var(--bl-duration-fast), color var(--bl-duration-fast);
+  font-family: var(--fl-font-sans);
+  transition: background var(--fl-duration-fast), color var(--fl-duration-fast);
 }
 
 .bulk-cancel:hover {
-  background: var(--bl-bg-hover);
-  color: var(--bl-text-primary);
+  background: var(--fl-bg-hover);
+  color: var(--fl-text-primary);
 }
 
 /* --- Empty state --- */
@@ -532,13 +532,13 @@ body {
 .empty-text {
   font-size: 14px;
   font-weight: 500;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   margin-bottom: 8px;
 }
 
 .empty-hint {
   font-size: 13px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   max-width: 280px;
   margin: 0 auto;
   line-height: 1.6;
@@ -567,16 +567,16 @@ body {
   position: relative;
   width: 90vw;
   max-width: 540px;
-  background: var(--bl-bg-elevated, #1c1c22);
+  background: var(--fl-bg-elevated, #1c1c22);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--bl-radius-lg);
+  border-radius: var(--fl-radius-lg);
   padding: 28px;
 }
 
 .confirm-panel h2 {
   font-size: 15px;
   font-weight: 600;
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   margin-bottom: 18px;
 }
 
@@ -591,13 +591,13 @@ body {
   width: 96px;
   height: 54px;
   object-fit: cover;
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   background: #16161a;
 }
 
 .confirm-info {
   font-size: 12px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
 }
 
 .confirm-field {
@@ -609,7 +609,7 @@ body {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 4px;
@@ -617,7 +617,7 @@ body {
 
 .confirm-value {
   font-size: 13px;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   word-break: break-all;
 }
 
@@ -632,19 +632,19 @@ body {
   gap: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   text-transform: none;
   letter-spacing: 0;
   cursor: pointer;
 }
 
 .confirm-check-label input[type="checkbox"] {
-  accent-color: var(--bl-violet);
+  accent-color: var(--fl-violet);
 }
 
 .confirm-sub {
   font-size: 11px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   margin-top: 8px;
   line-height: 1.6;
 }
@@ -657,7 +657,7 @@ body {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 4px;
@@ -669,21 +669,21 @@ body {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--bl-radius-sm);
-  color: var(--bl-text-primary);
-  font-family: var(--bl-font-sans);
+  border-radius: var(--fl-radius-sm);
+  color: var(--fl-text-primary);
+  font-family: var(--fl-font-sans);
   font-size: 13px;
   line-height: 1.5;
   resize: vertical;
 }
 
 .confirm-note::placeholder {
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
 }
 
 .confirm-note:focus {
   outline: none;
-  border-color: var(--bl-violet);
+  border-color: var(--fl-violet);
 }
 
 .confirm-identity-row {
@@ -696,7 +696,7 @@ body {
 .confirm-identity-row label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   flex-shrink: 0;
@@ -704,7 +704,7 @@ body {
 
 .confirm-status {
   padding: 12px 14px;
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   margin-top: 16px;
 }
 
@@ -725,15 +725,15 @@ body {
 
 .confirm-status-text {
   font-size: 13px;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
 }
 
 .confirm-status.success .confirm-status-text {
-  color: var(--bl-green);
+  color: var(--fl-green);
 }
 
 .confirm-status.error .confirm-status-text {
-  color: var(--bl-red);
+  color: var(--fl-red);
 }
 
 .confirm-warning {
@@ -741,9 +741,9 @@ body {
   padding: 8px 12px;
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.2);
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   font-size: 12px;
-  color: var(--bl-warning, #fbbf24);
+  color: var(--fl-warning, #fbbf24);
 }
 
 .confirm-actions {
@@ -756,14 +756,14 @@ body {
   flex: 1;
   padding: 10px 16px;
   border: none;
-  border-radius: var(--bl-radius-sm);
-  background: var(--bl-accent);
+  border-radius: var(--fl-radius-sm);
+  background: var(--fl-accent);
   color: white;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--bl-font-sans);
-  transition: background var(--bl-duration-fast), opacity var(--bl-duration-fast);
+  font-family: var(--fl-font-sans);
+  transition: background var(--fl-duration-fast), opacity var(--fl-duration-fast);
 }
 
 .confirm-btn-primary:hover:not(:disabled) {
@@ -778,19 +778,19 @@ body {
 .confirm-btn-secondary {
   padding: 10px 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   background: transparent;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  font-family: var(--bl-font-sans);
-  transition: background var(--bl-duration-fast), color var(--bl-duration-fast);
+  font-family: var(--fl-font-sans);
+  transition: background var(--fl-duration-fast), color var(--fl-duration-fast);
 }
 
 .confirm-btn-secondary:hover {
-  background: var(--bl-bg-hover);
-  color: var(--bl-text-primary);
+  background: var(--fl-bg-hover);
+  color: var(--fl-text-primary);
 }
 
 /* --- Video player lightbox --- */
@@ -820,7 +820,7 @@ body {
 
 .player-video {
   width: 100%;
-  border-radius: var(--bl-radius-md);
+  border-radius: var(--fl-radius-md);
   background: #000;
   display: block;
 }
@@ -833,18 +833,18 @@ body {
   height: 28px;
   border: none;
   background: none;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   font-size: 22px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: color var(--bl-duration-fast), background var(--bl-duration-fast);
+  transition: color var(--fl-duration-fast), background var(--fl-duration-fast);
 }
 
 .player-close:hover {
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   background: rgba(255, 255, 255, 0.1);
 }
 

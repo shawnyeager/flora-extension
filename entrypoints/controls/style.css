@@ -3,8 +3,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: var(--bl-bg-base);
-  font-family: var(--bl-font-sans);
+  background: var(--fl-bg-base);
+  font-family: var(--fl-font-sans);
   overflow: hidden;
   -webkit-app-region: drag; /* Allow dragging the window */
 }
@@ -21,13 +21,13 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--bl-accent);
+  background: var(--fl-accent);
   flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .rec-dot.paused {
-  background: var(--bl-amber);
+  background: var(--fl-amber);
   animation: none;
 }
 
@@ -37,17 +37,17 @@ body {
 }
 
 .timer {
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   min-width: 42px;
 }
 
 .divider {
   width: 1px;
   height: 18px;
-  background: var(--bl-border-subtle);
+  background: var(--fl-border-subtle);
 }
 
 .btn {
@@ -55,38 +55,38 @@ body {
   width: 30px;
   height: 30px;
   border: none;
-  border-radius: var(--bl-radius-sm);
+  border-radius: var(--fl-radius-sm);
   background: transparent;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: background var(--bl-duration-fast) var(--bl-ease),
-              color var(--bl-duration-fast) var(--bl-ease);
+  transition: background var(--fl-duration-fast) var(--fl-ease),
+              color var(--fl-duration-fast) var(--fl-ease);
 }
 
 .btn svg { width: 15px; height: 15px; }
 
 .btn:hover {
-  background: var(--bl-bg-hover);
-  color: var(--bl-text-primary);
+  background: var(--fl-bg-hover);
+  color: var(--fl-text-primary);
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 1px;
 }
 
-.btn.active { color: var(--bl-amber); }
+.btn.active { color: var(--fl-amber); }
 
 .btn-stop {
   margin-left: auto;
-  color: var(--bl-accent);
+  color: var(--fl-accent);
 }
 
 .btn-stop:hover {
   background: rgba(157, 72, 225, 0.15);
-  color: var(--bl-accent);
+  color: var(--fl-accent);
 }

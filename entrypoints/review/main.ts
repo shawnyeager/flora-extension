@@ -89,7 +89,7 @@ function showView(view: HTMLDivElement) {
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('bloom-recordings', 2);
+    const req = indexedDB.open('bloom-recordings', 2); // legacy name — do not rename (data loss)
     req.onupgradeneeded = (event) => {
       const db = req.result;
       let store: IDBObjectStore;
@@ -268,7 +268,7 @@ btnDownload.addEventListener('click', async () => {
     if (videoBlobUrl) {
       const a = document.createElement('a');
       a.href = videoBlobUrl;
-      a.download = `bloom-${Date.now()}.mp4`;
+      a.download = `flora-${Date.now()}.mp4`;
       a.click();
     }
   } catch (err) {

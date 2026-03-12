@@ -511,7 +511,7 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
       if (result?.dataUrl) {
         const a = document.createElement('a');
         a.href = result.dataUrl;
-        a.download = `bloom-${rec.timestamp}.mp4`;
+        a.download = `flora-${rec.timestamp}.mp4`;
         a.click();
       }
     } finally {

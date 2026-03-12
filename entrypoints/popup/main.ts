@@ -22,7 +22,7 @@ const headerLeft = el('div', 'header-left');
 const headerIcon = el('img', 'header-icon') as HTMLImageElement;
 headerIcon.src = '/icon/48.png';
 headerIcon.alt = '';
-const headerTitle = el('span', 'header-title', 'Bloom');
+const headerTitle = el('span', 'header-title', 'Flora');
 headerLeft.append(headerIcon, headerTitle);
 
 const headerActions = el('div', 'header-actions');

@@ -3,129 +3,129 @@
    ========================================== */
 :host {
   /* Surfaces */
-  --bl-bg-base: #111114;
-  --bl-bg-raised: #18181c;
-  --bl-bg-overlay: rgba(0, 0, 0, 0.84);
-  --bl-bg-subtle: rgba(255, 255, 255, 0.04);
-  --bl-bg-muted: rgba(255, 255, 255, 0.06);
-  --bl-bg-hover: rgba(255, 255, 255, 0.1);
+  --fl-bg-base: #111114;
+  --fl-bg-raised: #18181c;
+  --fl-bg-overlay: rgba(0, 0, 0, 0.84);
+  --fl-bg-subtle: rgba(255, 255, 255, 0.04);
+  --fl-bg-muted: rgba(255, 255, 255, 0.06);
+  --fl-bg-hover: rgba(255, 255, 255, 0.1);
 
   /* Borders */
-  --bl-border-subtle: rgba(255, 255, 255, 0.06);
-  --bl-border-muted: rgba(255, 255, 255, 0.1);
-  --bl-border-hover: rgba(255, 255, 255, 0.2);
+  --fl-border-subtle: rgba(255, 255, 255, 0.06);
+  --fl-border-muted: rgba(255, 255, 255, 0.1);
+  --fl-border-hover: rgba(255, 255, 255, 0.2);
 
   /* Text */
-  --bl-text-primary: #f0f0f2;
-  --bl-text-secondary: #9ca3af;
-  --bl-text-muted: #6b7280;
-  --bl-text-inverse: #111114;
+  --fl-text-primary: #f0f0f2;
+  --fl-text-secondary: #9ca3af;
+  --fl-text-muted: #6b7280;
+  --fl-text-inverse: #111114;
 
-  /* Accent — Bloom palette (derived from logo) */
-  --bl-accent: #9d48e1;
-  --bl-accent-hover: #8a35ce;
-  --bl-accent-subtle: rgba(157, 72, 225, 0.12);
-  --bl-violet: #9b6ec7;
-  --bl-violet-hover: #8558b3;
-  --bl-violet-subtle: rgba(155, 110, 199, 0.12);
-  --bl-cyan: #7ec8e3;
-  --bl-cyan-hover: #5fb8d9;
-  --bl-cyan-subtle: rgba(126, 200, 227, 0.1);
+  /* Accent — Flora palette (derived from logo) */
+  --fl-accent: #9d48e1;
+  --fl-accent-hover: #8a35ce;
+  --fl-accent-subtle: rgba(157, 72, 225, 0.12);
+  --fl-violet: #9b6ec7;
+  --fl-violet-hover: #8558b3;
+  --fl-violet-subtle: rgba(155, 110, 199, 0.12);
+  --fl-cyan: #7ec8e3;
+  --fl-cyan-hover: #5fb8d9;
+  --fl-cyan-subtle: rgba(126, 200, 227, 0.1);
 
   /* Semantic */
-  --bl-red: #ef4444;
-  --bl-red-hover: #dc2626;
-  --bl-red-subtle: rgba(239, 68, 68, 0.12);
-  --bl-green: #4ade80;
-  --bl-green-subtle: rgba(74, 222, 128, 0.12);
-  --bl-amber: #fbbf24;
-  --bl-amber-subtle: rgba(251, 191, 36, 0.08);
-  --bl-amber-border: rgba(251, 191, 36, 0.2);
+  --fl-red: #ef4444;
+  --fl-red-hover: #dc2626;
+  --fl-red-subtle: rgba(239, 68, 68, 0.12);
+  --fl-green: #4ade80;
+  --fl-green-subtle: rgba(74, 222, 128, 0.12);
+  --fl-amber: #fbbf24;
+  --fl-amber-subtle: rgba(251, 191, 36, 0.08);
+  --fl-amber-border: rgba(251, 191, 36, 0.2);
 
   /* Radii */
-  --bl-radius-sm: 6px;
-  --bl-radius-md: 10px;
-  --bl-radius-lg: 16px;
-  --bl-radius-pill: 9999px;
+  --fl-radius-sm: 6px;
+  --fl-radius-md: 10px;
+  --fl-radius-lg: 16px;
+  --fl-radius-pill: 9999px;
 
   /* Fonts */
-  --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --bl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+  --fl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --fl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
 
   /* Spacing */
-  --bl-space-xs: 4px;
-  --bl-space-sm: 8px;
-  --bl-space-md: 16px;
-  --bl-space-lg: 24px;
-  --bl-space-xl: 32px;
+  --fl-space-xs: 4px;
+  --fl-space-sm: 8px;
+  --fl-space-md: 16px;
+  --fl-space-lg: 24px;
+  --fl-space-xl: 32px;
 
   /* Shadows */
-  --bl-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --bl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --bl-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
+  --fl-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --fl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --fl-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
 
   /* Transitions */
-  --bl-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --bl-duration-fast: 0.15s;
-  --bl-duration-normal: 0.25s;
+  --fl-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --fl-duration-fast: 0.15s;
+  --fl-duration-normal: 0.25s;
 }
 
 /* ==========================================
    Webcam Bubble
    ========================================== */
-.bloom-webcam {
+.flora-webcam {
   position: fixed;
   width: 120px;
   height: 120px;
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--bl-shadow-md);
+  box-shadow: var(--fl-shadow-md);
   z-index: 2147483646;
   cursor: grab;
-  background: var(--bl-bg-base);
+  background: var(--fl-bg-base);
   display: none;
   pointer-events: auto;
   /* Use transform for snap animation, not layout properties */
-  transition: transform var(--bl-duration-normal) var(--bl-ease),
-              opacity var(--bl-duration-normal) var(--bl-ease);
+  transition: transform var(--fl-duration-normal) var(--fl-ease),
+              opacity var(--fl-duration-normal) var(--fl-ease);
 }
 
-.bloom-webcam.dragging {
+.flora-webcam.dragging {
   cursor: grabbing;
   transition: none !important;
 }
 
 
 /* Corner snap positions */
-.bloom-webcam.pos-bl { bottom: 80px; left: 24px; right: auto; top: auto; }
-.bloom-webcam.pos-br { bottom: 80px; right: 24px; left: auto; top: auto; }
-.bloom-webcam.pos-tl { top: 24px; left: 24px; right: auto; bottom: auto; }
-.bloom-webcam.pos-tr { top: 24px; right: 24px; left: auto; bottom: auto; }
+.flora-webcam.pos-bl { bottom: 80px; left: 24px; right: auto; top: auto; }
+.flora-webcam.pos-br { bottom: 80px; right: 24px; left: auto; top: auto; }
+.flora-webcam.pos-tl { top: 24px; left: 24px; right: auto; bottom: auto; }
+.flora-webcam.pos-tr { top: 24px; right: 24px; left: auto; bottom: auto; }
 
-.bloom-webcam video {
+.flora-webcam video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
 }
 
-.bloom-webcam-off {
+.flora-webcam-off {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
 }
 
-.bloom-webcam-off svg {
+.flora-webcam-off svg {
   width: 24px;
   height: 24px;
 }
 
 /* Camera toggle badge on bubble */
-.bloom-webcam-toggle {
+.flora-webcam-toggle {
   position: absolute;
   bottom: -2px;
   right: -2px;
@@ -133,36 +133,36 @@
   height: 32px;
   border-radius: 50%;
   background: rgba(15, 15, 15, 0.9);
-  border: 1px solid var(--bl-border-muted);
+  border: 1px solid var(--fl-border-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   padding: 0;
-  transition: background var(--bl-duration-fast), color var(--bl-duration-fast);
+  transition: background var(--fl-duration-fast), color var(--fl-duration-fast);
 }
 
 /* Expand tap target to 44px without changing visual size */
-.bloom-webcam-toggle::before {
+.flora-webcam-toggle::before {
   content: '';
   position: absolute;
   inset: -6px;
   border-radius: 50%;
 }
 
-.bloom-webcam-toggle:hover {
+.flora-webcam-toggle:hover {
   background: rgba(30, 30, 30, 0.95);
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
 }
 
-.bloom-webcam-toggle:focus-visible {
-  outline: 2px solid var(--bl-violet);
+.flora-webcam-toggle:focus-visible {
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
 }
 
-.bloom-webcam-toggle svg {
+.flora-webcam-toggle svg {
   width: 14px;
   height: 14px;
 }
@@ -170,7 +170,7 @@
 /* ==========================================
    Controls Bar
    ========================================== */
-.bloom-controls {
+.flora-controls {
   position: fixed;
   bottom: 24px;
   left: 50%;
@@ -179,55 +179,55 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--bl-bg-base);
-  border: 1px solid var(--bl-border-subtle);
-  border-radius: var(--bl-radius-pill);
-  box-shadow: var(--bl-shadow-md);
+  background: var(--fl-bg-base);
+  border: 1px solid var(--fl-border-subtle);
+  border-radius: var(--fl-radius-pill);
+  box-shadow: var(--fl-shadow-md);
   z-index: 2147483647;
-  font-family: var(--bl-font-sans);
+  font-family: var(--fl-font-sans);
   user-select: none;
   pointer-events: auto;
 }
 
-.bloom-rec-dot {
+.flora-rec-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--bl-accent);
-  animation: bloom-pulse 1.5s ease-in-out infinite;
+  background: var(--fl-accent);
+  animation: flora-pulse 1.5s ease-in-out infinite;
   flex-shrink: 0;
 }
 
-.bloom-rec-dot.paused {
+.flora-rec-dot.paused {
   animation: none;
   opacity: 0.3;
 }
 
-@keyframes bloom-pulse {
+@keyframes flora-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
 
-.bloom-timer {
+.flora-timer {
   font-size: 13px;
   font-weight: 600;
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
   font-variant-numeric: tabular-nums;
   min-width: 38px;
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
 }
 
-.bloom-divider {
+.flora-divider {
   width: 1px;
   height: 20px;
-  background: var(--bl-border-muted);
+  background: var(--fl-border-muted);
   flex-shrink: 0;
 }
 
-.bloom-btn-icon {
+.flora-btn-icon {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   padding: 0;
   border-radius: 50%;
   line-height: 1;
@@ -237,29 +237,29 @@
   width: 36px;
   height: 36px;
   cursor: pointer;
-  transition: background var(--bl-duration-fast), color var(--bl-duration-fast);
+  transition: background var(--fl-duration-fast), color var(--fl-duration-fast);
 }
 
-.bloom-btn-icon:hover {
-  background: var(--bl-bg-hover);
-  color: var(--bl-text-primary);
+.flora-btn-icon:hover {
+  background: var(--fl-bg-hover);
+  color: var(--fl-text-primary);
 }
 
-.bloom-btn-icon:active {
+.flora-btn-icon:active {
   transform: scale(0.92);
 }
 
-.bloom-btn-icon:focus-visible {
-  outline: 2px solid var(--bl-violet);
+.flora-btn-icon:focus-visible {
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
 }
 
-.bloom-btn-icon.active {
-  color: var(--bl-accent);
+.flora-btn-icon.active {
+  color: var(--fl-accent);
 }
 
-.bloom-btn-stop {
-  background: var(--bl-accent);
+.flora-btn-stop {
+  background: var(--fl-accent);
   border: none;
   color: white;
   padding: 0;
@@ -270,19 +270,19 @@
   width: 36px;
   height: 36px;
   cursor: pointer;
-  transition: background var(--bl-duration-fast);
+  transition: background var(--fl-duration-fast);
 }
 
-.bloom-btn-stop:hover {
-  background: var(--bl-accent-hover);
+.flora-btn-stop:hover {
+  background: var(--fl-accent-hover);
 }
 
-.bloom-btn-stop:active {
+.flora-btn-stop:active {
   transform: scale(0.92);
 }
 
-.bloom-btn-stop:focus-visible {
-  outline: 2px solid var(--bl-accent);
+.flora-btn-stop:focus-visible {
+  outline: 2px solid var(--fl-accent);
   outline-offset: 2px;
 }
 

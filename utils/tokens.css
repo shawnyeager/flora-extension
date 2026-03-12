@@ -1,77 +1,77 @@
 /* ==========================================
-   Bloom Design Tokens
+   Flora Design Tokens
    Shared across all page contexts.
    Overlay (Shadow DOM) copies these under :host.
    ========================================== */
 
 :root {
   /* Surfaces */
-  --bl-bg-base: #111114;
-  --bl-bg-raised: #18181c;
-  --bl-bg-overlay: rgba(0, 0, 0, 0.84);
-  --bl-bg-subtle: rgba(255, 255, 255, 0.04);
-  --bl-bg-muted: rgba(255, 255, 255, 0.06);
-  --bl-bg-hover: rgba(255, 255, 255, 0.1);
+  --fl-bg-base: #111114;
+  --fl-bg-raised: #18181c;
+  --fl-bg-overlay: rgba(0, 0, 0, 0.84);
+  --fl-bg-subtle: rgba(255, 255, 255, 0.04);
+  --fl-bg-muted: rgba(255, 255, 255, 0.06);
+  --fl-bg-hover: rgba(255, 255, 255, 0.1);
 
   /* Borders */
-  --bl-border-subtle: rgba(255, 255, 255, 0.06);
-  --bl-border-muted: rgba(255, 255, 255, 0.1);
-  --bl-border-hover: rgba(255, 255, 255, 0.2);
+  --fl-border-subtle: rgba(255, 255, 255, 0.06);
+  --fl-border-muted: rgba(255, 255, 255, 0.1);
+  --fl-border-hover: rgba(255, 255, 255, 0.2);
 
   /* Text */
-  --bl-text-primary: #f0f0f2;
-  --bl-text-secondary: #9ca3af;
-  --bl-text-muted: #6b7280;
-  --bl-text-inverse: #111114;
+  --fl-text-primary: #f0f0f2;
+  --fl-text-secondary: #9ca3af;
+  --fl-text-muted: #6b7280;
+  --fl-text-inverse: #111114;
 
-  /* Accent — Bloom palette (derived from logo) */
-  --bl-accent: #9d48e1;
-  --bl-accent-hover: #8a35ce;
-  --bl-accent-subtle: rgba(157, 72, 225, 0.12);
-  --bl-violet: #9b6ec7;
-  --bl-violet-hover: #8558b3;
-  --bl-violet-subtle: rgba(155, 110, 199, 0.12);
-  --bl-cyan: #7ec8e3;
-  --bl-cyan-hover: #5fb8d9;
-  --bl-cyan-subtle: rgba(126, 200, 227, 0.1);
+  /* Accent — Flora palette (derived from logo) */
+  --fl-accent: #9d48e1;
+  --fl-accent-hover: #8a35ce;
+  --fl-accent-subtle: rgba(157, 72, 225, 0.12);
+  --fl-violet: #9b6ec7;
+  --fl-violet-hover: #8558b3;
+  --fl-violet-subtle: rgba(155, 110, 199, 0.12);
+  --fl-cyan: #7ec8e3;
+  --fl-cyan-hover: #5fb8d9;
+  --fl-cyan-subtle: rgba(126, 200, 227, 0.1);
 
   /* Semantic */
-  --bl-red: #ef4444;
-  --bl-red-hover: #dc2626;
-  --bl-red-subtle: rgba(239, 68, 68, 0.12);
-  --bl-green: #4ade80;
-  --bl-green-subtle: rgba(74, 222, 128, 0.12);
-  --bl-amber: #fbbf24;
-  --bl-amber-subtle: rgba(251, 191, 36, 0.08);
-  --bl-amber-border: rgba(251, 191, 36, 0.2);
+  --fl-red: #ef4444;
+  --fl-red-hover: #dc2626;
+  --fl-red-subtle: rgba(239, 68, 68, 0.12);
+  --fl-green: #4ade80;
+  --fl-green-subtle: rgba(74, 222, 128, 0.12);
+  --fl-amber: #fbbf24;
+  --fl-amber-subtle: rgba(251, 191, 36, 0.08);
+  --fl-amber-border: rgba(251, 191, 36, 0.2);
 
   /* Radii */
-  --bl-radius-sm: 6px;
-  --bl-radius-md: 10px;
-  --bl-radius-lg: 16px;
-  --bl-radius-pill: 9999px;
+  --fl-radius-sm: 6px;
+  --fl-radius-md: 10px;
+  --fl-radius-lg: 16px;
+  --fl-radius-pill: 9999px;
 
   /* Fonts */
-  --bl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --bl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+  --fl-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --fl-font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
 
   /* Spacing */
-  --bl-space-xs: 4px;
-  --bl-space-sm: 8px;
-  --bl-space-md: 16px;
-  --bl-space-lg: 24px;
-  --bl-space-xl: 32px;
+  --fl-space-xs: 4px;
+  --fl-space-sm: 8px;
+  --fl-space-md: 16px;
+  --fl-space-lg: 24px;
+  --fl-space-xl: 32px;
 
   /* Layout */
-  --bl-container-width: 600px;
+  --fl-container-width: 600px;
 
   /* Shadows */
-  --bl-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --bl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --bl-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
+  --fl-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --fl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --fl-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
 
   /* Transitions */
-  --bl-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --bl-duration-fast: 0.15s;
-  --bl-duration-normal: 0.25s;
+  --fl-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --fl-duration-fast: 0.15s;
+  --fl-duration-normal: 0.25s;
 }

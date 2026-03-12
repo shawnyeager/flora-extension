@@ -7,9 +7,9 @@
 }
 
 body {
-  font-family: var(--bl-font-sans);
-  background: var(--bl-bg-base);
-  color: var(--bl-text-primary);
+  font-family: var(--fl-font-sans);
+  background: var(--fl-bg-base);
+  color: var(--fl-text-primary);
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -19,8 +19,8 @@ body {
 
 .container {
   width: 100%;
-  max-width: var(--bl-container-width);
-  animation: bl-fadein 0.3s var(--bl-ease);
+  max-width: var(--fl-container-width);
+  animation: bl-fadein 0.3s var(--fl-ease);
 }
 
 @keyframes bl-fadein {
@@ -49,17 +49,17 @@ h1 {
 
 .settings-link {
   font-size: 13px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-decoration: none;
-  transition: color var(--bl-duration-fast);
+  transition: color var(--fl-duration-fast);
 }
 
 .settings-link:hover {
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
 }
 
 .settings-link:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -75,7 +75,7 @@ h1 {
 
 video {
   width: 100%;
-  border-radius: var(--bl-radius-lg);
+  border-radius: var(--fl-radius-lg);
   background: #09090b;
   aspect-ratio: 16 / 9;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
@@ -84,9 +84,9 @@ video {
 
 .meta {
   font-size: 12px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   font-variant-numeric: tabular-nums;
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
   letter-spacing: 0.01em;
   margin-bottom: 24px;
 }
@@ -96,7 +96,7 @@ video {
 h2 {
   font-size: 11px;
   font-weight: 600;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 14px;
@@ -106,7 +106,7 @@ h2 {
 
 .destination-card {
   border: none;
-  border-top: 1px solid var(--bl-border-subtle);
+  border-top: 1px solid var(--fl-border-subtle);
   border-radius: 0;
   padding: 20px 0 0;
   margin-bottom: 24px;
@@ -119,12 +119,12 @@ h2 {
 /* --- Destination (confirm mode): contained card --- */
 
 .destination-card.editable {
-  border: 1px solid var(--bl-border-subtle);
-  border-top: 1px solid var(--bl-border-subtle);
-  border-radius: var(--bl-radius-md);
+  border: 1px solid var(--fl-border-subtle);
+  border-top: 1px solid var(--fl-border-subtle);
+  border-radius: var(--fl-radius-md);
   padding: 20px;
   margin-bottom: 24px;
-  background: var(--bl-bg-raised);
+  background: var(--fl-bg-raised);
 }
 
 /* --- Fields --- */
@@ -137,7 +137,7 @@ h2 {
 
 .field label {
   font-size: 11px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -145,35 +145,35 @@ h2 {
 
 .field-value {
   font-size: 14px;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   word-break: break-all;
 }
 
 .field-value.mono {
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
   font-size: 13px;
-  color: var(--bl-violet);
+  color: var(--fl-violet);
 }
 
 .field-input {
   padding: 8px 10px;
-  border: 1px solid var(--bl-border-muted);
-  border-radius: var(--bl-radius-sm);
-  background: var(--bl-bg-base);
-  color: var(--bl-text-primary);
+  border: 1px solid var(--fl-border-muted);
+  border-radius: var(--fl-radius-sm);
+  background: var(--fl-bg-base);
+  color: var(--fl-text-primary);
   font-size: 14px;
-  font-family: var(--bl-font-mono);
-  transition: border-color var(--bl-duration-fast);
+  font-family: var(--fl-font-mono);
+  transition: border-color var(--fl-duration-fast);
 }
 
 .field-input:focus {
   outline: none;
-  border-color: var(--bl-violet);
+  border-color: var(--fl-violet);
 }
 
 .field-sub {
   font-size: 12px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   padding-left: 24px;
   word-break: break-all;
 }
@@ -183,12 +183,12 @@ h2 {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   cursor: pointer;
 }
 
 .check-label input[type="checkbox"] {
-  accent-color: var(--bl-violet);
+  accent-color: var(--fl-violet);
   width: 16px;
   height: 16px;
 }
@@ -197,11 +197,11 @@ h2 {
 
 .warning {
   font-size: 13px;
-  color: var(--bl-amber);
+  color: var(--fl-amber);
   padding: 12px 14px;
-  border: 1px solid var(--bl-amber-border);
-  border-radius: var(--bl-radius-sm);
-  background: var(--bl-amber-subtle);
+  border: 1px solid var(--fl-amber-border);
+  border-radius: var(--fl-radius-sm);
+  background: var(--fl-amber-subtle);
   margin-bottom: 4px;
   line-height: 1.4;
 }
@@ -226,27 +226,27 @@ h2 {
   width: 100%;
   padding: 13px;
   border: none;
-  border-radius: var(--bl-radius-md);
-  background: var(--bl-accent);
-  color: var(--bl-text-primary);
+  border-radius: var(--fl-radius-md);
+  background: var(--fl-accent);
+  color: var(--fl-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--bl-duration-fast), transform 0.1s;
-  font-family: var(--bl-font-sans);
+  transition: background var(--fl-duration-fast), transform 0.1s;
+  font-family: var(--fl-font-sans);
 }
 
-.btn-primary:hover { background: var(--bl-accent-hover); }
+.btn-primary:hover { background: var(--fl-accent-hover); }
 .btn-primary:active { transform: scale(0.98); }
 
 .btn-primary:focus-visible {
-  outline: 2px solid var(--bl-accent);
+  outline: 2px solid var(--fl-accent);
   outline-offset: 2px;
 }
 
 .btn-primary:disabled {
-  background: var(--bl-bg-muted);
-  color: var(--bl-text-muted);
+  background: var(--fl-bg-muted);
+  color: var(--fl-text-muted);
   cursor: not-allowed;
   transform: none;
 }
@@ -256,20 +256,20 @@ h2 {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--bl-duration-fast);
-  font-family: var(--bl-font-sans);
+  transition: color var(--fl-duration-fast);
+  font-family: var(--fl-font-sans);
 }
 
 .btn-secondary:hover {
-  color: var(--bl-text-primary);
+  color: var(--fl-text-primary);
 }
 
 .btn-secondary:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -279,20 +279,20 @@ h2 {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--bl-duration-fast);
-  font-family: var(--bl-font-sans);
+  transition: color var(--fl-duration-fast);
+  font-family: var(--fl-font-sans);
 }
 
 .btn-ghost:hover {
-  color: var(--bl-text-secondary);
+  color: var(--fl-text-secondary);
 }
 
 .btn-ghost:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -314,23 +314,23 @@ h2 {
 .progress-bar-track {
   width: 100%;
   height: 3px;
-  background: var(--bl-bg-muted);
+  background: var(--fl-bg-muted);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: var(--bl-accent);
+  background: var(--fl-accent);
   border-radius: 2px;
-  transition: width 0.3s var(--bl-ease);
+  transition: width 0.3s var(--fl-ease);
 }
 
 .progress-detail {
   font-size: 12px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   font-variant-numeric: tabular-nums;
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
 }
 
 /* --- Complete --- */
@@ -347,8 +347,8 @@ h2 {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--bl-green-subtle);
-  color: var(--bl-green);
+  background: var(--fl-green-subtle);
+  color: var(--fl-green);
   font-size: 20px;
   display: flex;
   align-items: center;
@@ -362,17 +362,17 @@ h2 {
 
 .result-link {
   font-size: 13px;
-  color: var(--bl-violet);
+  color: var(--fl-violet);
   word-break: break-all;
   text-align: center;
   text-decoration: none;
-  font-family: var(--bl-font-mono);
+  font-family: var(--fl-font-mono);
 }
 
 .result-link:hover { text-decoration: underline; }
 
 .result-link:focus-visible {
-  outline: 2px solid var(--bl-violet);
+  outline: 2px solid var(--fl-violet);
   outline-offset: 2px;
 }
 
@@ -389,12 +389,12 @@ h2 {
 .error-title {
   font-size: 17px;
   font-weight: 600;
-  color: var(--bl-red);
+  color: var(--fl-red);
 }
 
 .error-message {
   font-size: 14px;
-  color: var(--bl-text-muted);
+  color: var(--fl-text-muted);
   text-align: center;
   max-width: 320px;
   line-height: 1.5;

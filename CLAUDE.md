@@ -1,4 +1,4 @@
-# Bloom
+# Flora
 
 Decentralized screen recording Chrome extension — Loom on Nostr + Blossom.
 
@@ -17,7 +17,7 @@ Content creators and Nostr power users who want fast, frictionless async video s
 
 ### Brand Personality
 
-**Playful, warm, approachable.** Bloom should feel like a friendly tool that's delightful to use — not intimidating, not sterile, not "serious software." It should bring a smile. The flower logo is central to the identity: organic, colorful, alive.
+**Playful, warm, approachable.** Flora should feel like a friendly tool that's delightful to use — not intimidating, not sterile, not "serious software." It should bring a smile. The flower logo is central to the identity: organic, colorful, alive.
 
 ### Aesthetic Direction
 
@@ -29,9 +29,9 @@ Content creators and Nostr power users who want fast, frictionless async video s
 
 **Color palette**: Derived from the logo — overlapping translucent petals of pink, violet, and cyan around a dark lens center.
 
-- **Primary accent**: Bloom berry (`oklch(62% 0.15 340)` / ~#c96b9c) — the petal overlap between pink and violet, used for primary actions and recording states
-- **Secondary accent**: Bloom violet (`oklch(62% 0.19 295)` / ~#9b6ec7) — the deepest petal overlap, used for selection, focus, and interactive highlights
-- **Tertiary accent**: Bloom cyan (`oklch(78% 0.12 210)` / ~#7ec8e3) — the coolest petal, used for links, informational states, and secondary buttons
+- **Primary accent**: Flora berry (`oklch(62% 0.15 340)` / ~#c96b9c) — the petal overlap between pink and violet, used for primary actions and recording states
+- **Secondary accent**: Flora violet (`oklch(62% 0.19 295)` / ~#9b6ec7) — the deepest petal overlap, used for selection, focus, and interactive highlights
+- **Tertiary accent**: Flora cyan (`oklch(78% 0.12 210)` / ~#7ec8e3) — the coolest petal, used for links, informational states, and secondary buttons
 - **Success**: Soft green (`oklch(76% 0.15 155)` / ~#4ade80)
 - **Warning**: Warm amber (`oklch(80% 0.14 80)` / ~#fbbf24)
 - **Danger/Error**: Keep the existing red (`#ef4444`) — universally understood for destructive actions
@@ -54,25 +54,25 @@ Content creators and Nostr power users who want fast, frictionless async video s
 
 ### CSS Token Prefix
 
-All custom properties use `--bl-` prefix (BL = Bloom).
+All custom properties use `--fl-` prefix (FL = Flora).
 
 ### Spacing Scale
 
 ```
---bl-space-xs: 4px
---bl-space-sm: 8px
---bl-space-md: 16px
---bl-space-lg: 24px
---bl-space-xl: 32px
+--fl-space-xs: 4px
+--fl-space-sm: 8px
+--fl-space-md: 16px
+--fl-space-lg: 24px
+--fl-space-xl: 32px
 ```
 
 ### Border Radius
 
 ```
---bl-radius-sm: 6px
---bl-radius-md: 10px
---bl-radius-lg: 16px
---bl-radius-pill: 9999px
+--fl-radius-sm: 6px
+--fl-radius-md: 10px
+--fl-radius-lg: 16px
+--fl-radius-pill: 9999px
 ```
 
 ### Animation
