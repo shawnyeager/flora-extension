@@ -38,7 +38,12 @@ let relays: string[] = [];
 const toast = document.createElement('div');
 toast.className = 'saved-toast';
 toast.textContent = 'Saved';
+toast.setAttribute('role', 'status');
+toast.setAttribute('aria-live', 'polite');
 document.body.append(toast);
+
+const serverError = document.getElementById('server-error') as HTMLDivElement;
+const relayError = document.getElementById('relay-error') as HTMLDivElement;
 
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -55,8 +60,16 @@ function renderList(
   urls: string[],
   onRemove: (index: number) => void,
   badgeLabel?: string,
+  emptyText?: string,
 ) {
   list.replaceChildren();
+  if (urls.length === 0 && emptyText) {
+    const empty = document.createElement('li');
+    empty.className = 'url-empty';
+    empty.textContent = emptyText;
+    list.append(empty);
+    return;
+  }
   urls.forEach((url, i) => {
     const li = document.createElement('li');
     li.className = 'url-item';
@@ -99,7 +112,7 @@ function isValidUrl(value: string, protocol: string): boolean {
 // --- Server management ---
 
 function renderServers() {
-  renderList(serverList, servers, removeServer, 'primary');
+  renderList(serverList, servers, removeServer, 'primary', 'No servers added yet');
 }
 
 async function addServer() {
@@ -108,16 +121,22 @@ async function addServer() {
 
   if (!isValidUrl(value, 'https:')) {
     serverInput.classList.add('invalid');
+    serverError.classList.add('visible');
+    serverError.textContent = 'Enter a valid https:// URL';
     serverInput.focus();
     return;
   }
 
   if (servers.includes(value)) {
     serverInput.value = '';
+    serverError.classList.add('visible');
+    serverError.textContent = 'Already added';
+    setTimeout(() => serverError.classList.remove('visible'), 2000);
     return;
   }
 
   serverInput.classList.remove('invalid');
+  serverError.classList.remove('visible');
   servers.push(value);
   serverInput.value = '';
   renderServers();
@@ -138,12 +157,13 @@ serverInput.addEventListener('keydown', (e) => {
 });
 serverInput.addEventListener('input', () => {
   serverInput.classList.remove('invalid');
+  serverError.classList.remove('visible');
 });
 
 // --- Relay management ---
 
 function renderRelays() {
-  renderList(relayList, relays, removeRelay);
+  renderList(relayList, relays, removeRelay, undefined, 'No relays added yet');
 }
 
 async function addRelay() {
@@ -152,16 +172,22 @@ async function addRelay() {
 
   if (!isValidUrl(value, 'wss:')) {
     relayInput.classList.add('invalid');
+    relayError.classList.add('visible');
+    relayError.textContent = 'Enter a valid wss:// URL';
     relayInput.focus();
     return;
   }
 
   if (relays.includes(value)) {
     relayInput.value = '';
+    relayError.classList.add('visible');
+    relayError.textContent = 'Already added';
+    setTimeout(() => relayError.classList.remove('visible'), 2000);
     return;
   }
 
   relayInput.classList.remove('invalid');
+  relayError.classList.remove('visible');
   relays.push(value);
   relayInput.value = '';
   renderRelays();
@@ -182,6 +208,7 @@ relayInput.addEventListener('keydown', (e) => {
 });
 relayInput.addEventListener('input', () => {
   relayInput.classList.remove('invalid');
+  relayError.classList.remove('visible');
 });
 
 // --- Publish toggle (auto-save) ---
