@@ -16,7 +16,7 @@ body {
 }
 
 .container {
-  max-width: 600px;
+  max-width: var(--bl-container-width);
   margin: 0 auto;
 }
 

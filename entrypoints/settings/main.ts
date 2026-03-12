@@ -4,17 +4,10 @@ import { MessageType } from '@/utils/messages';
 const serversEl = document.getElementById('servers') as HTMLTextAreaElement;
 const relaysEl = document.getElementById('relays') as HTMLTextAreaElement;
 const publishToggle = document.getElementById('publish-toggle') as HTMLInputElement;
-const identityEl = document.getElementById('identity') as HTMLSpanElement;
+const identityEl = document.getElementById('identity') as HTMLDivElement;
+const identityValue = identityEl.querySelector('.identity-value') as HTMLSpanElement;
+const identityHint = identityEl.querySelector('.identity-hint') as HTMLSpanElement;
 const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
-const backBtn = document.getElementById('back') as HTMLAnchorElement;
-
-// --- Navigation ---
-
-backBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  // Go to recordings page (settings always opens in a tab)
-  window.location.href = browser.runtime.getURL('/recordings.html');
-});
 
 // --- Load ---
 
@@ -25,25 +18,36 @@ async function loadSettings() {
   publishToggle.checked = settings.publishToNostr;
 }
 
-// --- Identity (inline in header) ---
+// --- Identity ---
 
 async function detectIdentity() {
-  identityEl.textContent = '';
+  identityHint.textContent = 'Checking\u2026';
+  identityEl.classList.add('checking');
 
   try {
     const result = await Promise.race([
       browser.runtime.sendMessage({ type: MessageType.NIP07_PROBE }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
     ]);
+    identityEl.classList.remove('checking');
 
     if (result && typeof result === 'object' && 'pubkey' in result && result.pubkey) {
       const hex = result.pubkey as string;
-      identityEl.textContent = `${hex.slice(0, 8)}…${hex.slice(-8)}`;
-      identityEl.title = hex;
+      identityValue.textContent = hex;
+      identityValue.title = hex;
+      identityHint.textContent = 'Via NIP-07 signer';
+    } else {
+      showIdentityFallback();
     }
   } catch {
-    // No signer — just leave identity empty, it hides via :empty
+    showIdentityFallback();
   }
+}
+
+function showIdentityFallback() {
+  identityEl.classList.remove('checking');
+  identityValue.textContent = '';
+  identityHint.textContent = 'No NIP-07 signer detected. Install nos2x or Alby to sign events.';
 }
 
 // --- Save ---
@@ -75,7 +79,7 @@ btnSave.addEventListener('click', async () => {
 
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
-    btnSave.textContent = 'Save';
+    btnSave.textContent = 'Save settings';
     btnSave.classList.remove('saved');
   }, 1500);
 });

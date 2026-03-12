@@ -16,7 +16,7 @@ body {
 
 .container {
   width: 100%;
-  max-width: 640px;
+  max-width: var(--bl-container-width);
   display: flex;
   flex-direction: column;
   gap: 24px;

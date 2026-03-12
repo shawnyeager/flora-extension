@@ -9,34 +9,43 @@
 <body>
   <div class="container">
     <header class="header">
-      <a href="#" id="back" class="header-back" aria-label="Back to recordings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </a>
       <img src="/icon/48.png" alt="" class="header-icon">
-      <h1 class="header-title">Settings</h1>
-      <span id="identity" class="header-identity" title=""></span>
+      <div>
+        <h1 class="header-title">Bloom</h1>
+        <p class="header-sub">Settings</p>
+      </div>
     </header>
 
-    <section class="section">
-      <label class="field-label" for="servers">Blossom servers</label>
-      <textarea id="servers" rows="2" placeholder="https://blossom.band" spellcheck="false" autocomplete="off"></textarea>
-      <p class="hint">Upload destination. First URL is the default.</p>
-    </section>
+    <div class="group">
+      <h2 class="group-title">Connection</h2>
 
-    <section class="section">
-      <label class="field-label" for="relays">Nostr relays</label>
-      <textarea id="relays" rows="2" placeholder="wss://relay.damus.io" spellcheck="false" autocomplete="off"></textarea>
-      <p class="hint">One per line.</p>
-    </section>
+      <div class="field">
+        <label class="field-label" for="servers">Blossom servers</label>
+        <textarea id="servers" rows="2" placeholder="https://blossom.band" spellcheck="false" autocomplete="off"></textarea>
+        <p class="field-hint">Upload destination. First URL is the default.</p>
+      </div>
 
-    <label class="toggle-row">
-      <input type="checkbox" id="publish-toggle">
-      <span>Publish to Nostr by default</span>
-    </label>
+      <div class="field">
+        <label class="field-label" for="relays">Nostr relays</label>
+        <textarea id="relays" rows="2" placeholder="wss://relay.damus.io" spellcheck="false" autocomplete="off"></textarea>
+        <p class="field-hint">One per line.</p>
+      </div>
 
-    <div class="actions">
-      <button id="btn-save" class="btn-save">Save</button>
+      <label class="toggle-row">
+        <input type="checkbox" id="publish-toggle">
+        <span>Publish to Nostr by default</span>
+      </label>
     </div>
+
+    <div class="group">
+      <h2 class="group-title">Identity</h2>
+      <div id="identity" class="identity-display">
+        <span class="identity-value"></span>
+        <span class="identity-hint"></span>
+      </div>
+    </div>
+
+    <button id="btn-save" class="btn-save">Save settings</button>
   </div>
   <script src="./main.ts" type="module"></script>
 </body>

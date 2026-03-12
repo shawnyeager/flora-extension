@@ -62,6 +62,9 @@
   --bl-space-lg: 24px;
   --bl-space-xl: 32px;
 
+  /* Layout */
+  --bl-container-width: 600px;
+
   /* Shadows */
   --bl-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --bl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
