@@ -70,6 +70,9 @@ export const MessageType = {
 
   // Recording controls state (popup <-> background)
   GET_RECORDING_STATE: 'get_recording_state',
+
+  // Navigation
+  OPEN_SETTINGS: 'open_settings',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -301,6 +304,10 @@ export interface GetRecordingStateMessage extends BaseMessage {
   type: typeof MessageType.GET_RECORDING_STATE;
 }
 
+export interface OpenSettingsMessage extends BaseMessage {
+  type: typeof MessageType.OPEN_SETTINGS;
+}
+
 export interface RecordingControlsState {
   paused: boolean;
   micMuted: boolean;
@@ -349,4 +356,5 @@ export type Message =
   | UploadFromLibraryMessage
   | GenerateThumbnailMessage
   | DeleteRecordingsMessage
-  | GetRecordingStateMessage;
+  | GetRecordingStateMessage
+  | OpenSettingsMessage;
