@@ -16,39 +16,31 @@
       </div>
     </header>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Blossom Servers</h2>
-        <p class="hint">Upload destination. First URL is the default.</p>
-      </div>
+    <section class="section">
+      <h2>Blossom Servers</h2>
+      <p class="hint">Upload destination. First URL is the default.</p>
       <textarea id="servers" rows="3" placeholder="https://blossom.band" spellcheck="false" autocomplete="off"></textarea>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Nostr Relays</h2>
-        <p class="hint">Where notes are published. One URL per line.</p>
-      </div>
+    <section class="section">
+      <h2>Nostr Relays</h2>
+      <p class="hint">Where notes are published. One URL per line.</p>
       <textarea id="relays" rows="3" placeholder="wss://relay.damus.io" spellcheck="false" autocomplete="off"></textarea>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Publishing</h2>
-      </div>
+    <section class="section">
+      <h2>Publishing</h2>
       <label class="toggle-row">
         <input type="checkbox" id="publish-toggle">
         <span>Publish to Nostr by default</span>
       </label>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Identity</h2>
-        <p class="hint">Your Nostr public key, detected via NIP-07 signer extension.</p>
-      </div>
+    <section class="section">
+      <h2>Identity</h2>
+      <p class="hint">Detected via your NIP-07 signer extension.</p>
       <div id="identity" class="identity-display"></div>
-    </div>
+    </section>
 
     <div class="actions">
       <button id="btn-save" class="btn-save">Save</button>

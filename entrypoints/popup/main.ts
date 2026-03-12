@@ -50,8 +50,21 @@ const statusDot = el('div', 'status-dot');
 const statusText = el('span', 'status-text', 'Ready');
 statusBar.append(statusDot, statusText);
 
-// --- Destination info (visible when idle) ---
+// --- Destination info (collapsible) ---
+const CHEVRON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+const destToggle = el('button', 'dest-toggle');
+destToggle.innerHTML = `<span>Destination</span>${CHEVRON_SVG}`;
+destToggle.addEventListener('click', () => {
+  const open = destToggle.classList.toggle('open');
+  destBody.classList.toggle('open', open);
+});
+
+const destBody = el('div', 'dest-body');
+const destBodyInner = el('div', 'dest-body-inner');
 const destInfo = el('div', 'dest-info');
+destBodyInner.append(destInfo);
+destBody.append(destBodyInner);
 
 function destRow(label: string, value: string): HTMLDivElement {
   const row = el('div', 'dest-row');
@@ -74,20 +87,23 @@ async function loadDestination() {
 }
 
 // --- Buttons ---
-const btnRecord = el('button', 'btn-record', 'Start Recording');
+const RECORD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5"/></svg>';
+
+const btnRecord = el('button', 'btn-record');
+btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
 const btnStop = el('button', 'btn-stop', 'Stop Recording');
 btnStop.style.display = 'none';
 const btnOpen = el('button', 'btn-open', 'Open Review');
 btnOpen.style.display = 'none';
 
-app.append(header, statusBar, destInfo, btnRecord, btnStop, btnOpen);
+app.append(header, statusBar, destToggle, destBody, btnRecord, btnStop, btnOpen);
 
 loadDestination();
 
 // --- Events ---
 btnRecord.addEventListener('click', async () => {
   btnRecord.disabled = true;
-  btnRecord.textContent = 'Starting\u2026';
+  btnRecord.innerHTML = `${RECORD_ICON} Starting\u2026`;
 
   try {
     const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
@@ -100,7 +116,7 @@ btnRecord.addEventListener('click', async () => {
     }
   } catch {
     btnRecord.disabled = false;
-    btnRecord.textContent = 'Start Recording';
+    btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
   }
 });
 
@@ -157,11 +173,13 @@ function updateUI(state: ExtensionState) {
   statusDot.classList.toggle('recording', RECORDING_STATES.includes(state));
   statusDot.classList.toggle('active', ACTIVE_STATES.includes(state));
 
-  destInfo.style.display = state === 'idle' ? 'flex' : 'none';
+  const isIdle = state === 'idle';
+  destToggle.style.display = isIdle ? '' : 'none';
+  destBody.style.display = isIdle ? '' : 'none';
 
-  btnRecord.style.display = state === 'idle' ? 'block' : 'none';
+  btnRecord.style.display = isIdle ? 'flex' : 'none';
   btnRecord.disabled = false;
-  btnRecord.textContent = 'Start Recording';
+  btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
 
   btnStop.style.display = state === 'recording' ? 'block' : 'none';
   btnStop.disabled = false;

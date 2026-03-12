@@ -206,10 +206,10 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
 
   // Uploaded indicator
   if (rec.uploaded) {
-    const dot = document.createElement('span');
-    dot.className = 'rec-uploaded-dot';
-    dot.title = 'Uploaded';
-    thumb.append(dot);
+    const badge = document.createElement('span');
+    badge.className = 'rec-uploaded-badge';
+    badge.textContent = 'Shared';
+    thumb.append(badge);
   }
 
   // Click thumbnail to open or toggle selection
@@ -305,6 +305,7 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
   delBtn.setAttribute('aria-label', 'Delete');
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
+    if (!confirm('Delete this recording? This cannot be undone.')) return;
     await browser.runtime.sendMessage({
       type: MessageType.DELETE_RECORDING,
       hash: rec.hash,
@@ -317,6 +318,24 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
   card.append(meta);
 
   return card;
+}
+
+// --- Date grouping ---
+
+function getDateGroup(ts: number): string {
+  const now = new Date();
+  const date = new Date(ts);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+  if (ts >= today.getTime()) return 'Today';
+  if (ts >= yesterday.getTime()) return 'Yesterday';
+  if (ts >= weekAgo.getTime()) return 'This week';
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, { month: 'long' });
+  }
+  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 // --- Render ---
@@ -335,8 +354,22 @@ function renderGrid(recs: RecordingMeta[]) {
     if (!recs.find((r) => r.hash === hash)) selected.delete(hash);
   }
 
+  let lastGroup = '';
   for (let i = 0; i < recs.length; i++) {
-    gridEl.append(createCard(recs[i], i));
+    // Date group separator
+    const group = getDateGroup(recs[i].timestamp);
+    if (group !== lastGroup) {
+      const sep = document.createElement('div');
+      sep.className = 'date-group';
+      sep.textContent = group;
+      gridEl.append(sep);
+      lastGroup = group;
+    }
+
+    const card = createCard(recs[i], i);
+    // First recording is hero (spans full width)
+    if (i === 0) card.classList.add('hero');
+    gridEl.append(card);
   }
 
   updateSelectionUI();
@@ -357,6 +390,10 @@ async function loadRecordings() {
 bulkDeleteBtn.addEventListener('click', async () => {
   const hashes = [...selected];
   if (hashes.length === 0) return;
+
+  const count = hashes.length;
+  const noun = count === 1 ? 'recording' : 'recordings';
+  if (!confirm(`Delete ${count} ${noun}? This cannot be undone.`)) return;
 
   await browser.runtime.sendMessage({
     type: MessageType.DELETE_RECORDINGS,
