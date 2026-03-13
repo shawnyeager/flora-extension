@@ -303,10 +303,11 @@ export default defineContentScript({
       } catch {
         webcamAcquiring = false;
         if (webcamAborted) return;
+        // Show camera-off indicator instead of hiding the bubble entirely.
+        // The bubble stays visible so the user knows recording is active.
         videoEl.style.display = 'none';
         offEl.style.display = 'flex';
         webcamOn = false;
-        bubble.style.display = 'none';
       }
     }
 
@@ -407,11 +408,21 @@ export default defineContentScript({
 
         // Show bubble and acquire webcam if on
         if (msg.webcamOn) {
+          // Always show the bubble immediately (with camera-off placeholder).
+          // startWebcamPreview will upgrade to live video if getUserMedia succeeds.
+          if (bubble) bubble.style.display = 'block';
           if (webcamStream) {
-            // Already have webcam (switching back to this tab) — just show bubble
-            if (bubble) bubble.style.display = 'block';
+            // Already have webcam (switching back to this tab) — video is live
+            const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLElement;
+            const offEl = ui.shadow.querySelector('.flora-webcam-off') as HTMLElement;
+            if (videoEl) videoEl.style.display = 'block';
+            if (offEl) offEl.style.display = 'none';
           } else {
-            // New tab or first time — acquire webcam
+            // Show camera-off indicator while we try to acquire
+            const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLElement;
+            const offEl = ui.shadow.querySelector('.flora-webcam-off') as HTMLElement;
+            if (videoEl) videoEl.style.display = 'none';
+            if (offEl) offEl.style.display = 'flex';
             startWebcamPreview();
           }
         } else {
@@ -457,6 +468,9 @@ export default defineContentScript({
     try {
       const result = await browser.storage.local.get('state');
       if (result.state) updateUI(result.state as ExtensionState);
+      // Ping background — if this is the overlay tab during recording,
+      // it will send OVERLAY_SHOW to (re)start the webcam after page navigation.
+      browser.runtime.sendMessage({ type: MessageType.GET_STATE }).catch(() => {});
     } catch { /* extension context may not be available */ }
   },
 });

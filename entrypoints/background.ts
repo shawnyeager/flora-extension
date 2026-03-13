@@ -214,17 +214,11 @@ export default defineBackground(() => {
     const tab = await browser.tabs.get(activeInfo.tabId).catch(() => null);
     if (!tab?.url || !/^https?:/.test(tab.url)) return;
 
-    const prevTab = overlayTabId;
     overlayTabId = activeInfo.tabId;
 
-    // Hide overlay on previous tab
-    if (prevTab && prevTab !== activeInfo.tabId) {
-      browser.tabs.sendMessage(prevTab, {
-        type: MessageType.OVERLAY_HIDE,
-      }).catch(() => {});
-    }
-
-    // Show overlay on new tab
+    // Don't send OVERLAY_HIDE to the old tab. The bubble stays visible there
+    // (important for tab capture — hiding it removes webcam from the recording).
+    // Just send OVERLAY_SHOW to the new tab so it also gets a bubble.
     browser.tabs.sendMessage(activeInfo.tabId, {
       type: MessageType.OVERLAY_SHOW,
       webcamOn: controlsState.webcamOn,
@@ -240,6 +234,15 @@ export default defineBackground(() => {
       switch (message.type) {
         case MessageType.GET_STATE:
           sendResponse(currentState);
+          // If a content script on the overlay tab reloads during recording
+          // (page navigation), re-send OVERLAY_SHOW to restart its webcam.
+          if (isRecordingActive(currentState) && _sender.tab?.id === overlayTabId) {
+            browser.tabs.sendMessage(overlayTabId, {
+              type: MessageType.OVERLAY_SHOW,
+              webcamOn: controlsState.webcamOn,
+              corner: overlayCorner,
+            }).catch(() => {});
+          }
           return false;
 
         case MessageType.RESET_STATE: {
