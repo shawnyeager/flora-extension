@@ -137,6 +137,26 @@ async function closeOffscreenDocument() {
   await (browser as any).offscreen.closeDocument();
 }
 
+/** Light probe: just check if window.nostr exists, don't call getPublicKey (triggers signer popup). */
+async function probeNip07Exists(tabId: number): Promise<{ available: true } | { error: string }> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const nostr = (window as any).nostr;
+        if (!nostr) return { error: 'No NIP-07 signer found' };
+        if (typeof nostr.getPublicKey !== 'function') return { error: 'window.nostr.getPublicKey is not a function' };
+        return { available: true };
+      },
+    });
+    return results?.[0]?.result || { error: 'scripting.executeScript returned no result' };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+/** Full probe: actually calls getPublicKey with a timeout. Use only when we need the pubkey. */
 async function probeNip07Direct(tabId: number): Promise<{ pubkey: string } | { error: string }> {
   try {
     const results = await (browser as any).scripting.executeScript({
@@ -146,10 +166,14 @@ async function probeNip07Direct(tabId: number): Promise<{ pubkey: string } | { e
         const nostr = (window as any).nostr;
         if (!nostr) return { error: 'No NIP-07 signer found (window.nostr missing)' };
         if (typeof nostr.getPublicKey !== 'function') return { error: 'window.nostr.getPublicKey is not a function' };
-        return nostr.getPublicKey().then(
-          (pk: any) => pk ? { pubkey: String(pk) } : { error: 'getPublicKey() returned empty' },
-          (err: any) => ({ error: String(err) }),
-        );
+        // Race against timeout — some signers hang forever
+        return Promise.race([
+          nostr.getPublicKey().then(
+            (pk: any) => pk ? { pubkey: String(pk) } : { error: 'getPublicKey() returned empty' },
+            (err: any) => ({ error: String(err) }),
+          ),
+          new Promise((resolve) => setTimeout(() => resolve({ error: 'getPublicKey timed out (5s)' }), 5000)),
+        ]);
       },
     });
     return results?.[0]?.result || { error: 'scripting.executeScript returned no result' };
@@ -523,24 +547,50 @@ export default defineBackground(() => {
 
         case MessageType.NIP07_SIGN: {
           findScriptableTab()
-            .then((tabId) => {
+            .then(async (tabId) => {
               if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-07' });
-              return signEventDirect(tabId, (message as any).event).then((r) => sendResponse(r));
+
+              // Remember which tab the user is on (review page) so we can switch back
+              const [callerTab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+              const callerTabId = callerTab?.id;
+
+              // Focus the signing tab so the user can see the signer popup
+              await browser.tabs.update(tabId, { active: true });
+
+              const result = await signEventDirect(tabId, (message as any).event);
+
+              // Switch back to the review tab
+              if (callerTabId) {
+                browser.tabs.update(callerTabId, { active: true }).catch(() => {});
+              }
+
+              // Auto-populate nostrPubkey from signed event if not already set
+              if (result.ok && result.data?.pubkey) {
+                const settings = await getSettings();
+                if (!settings.nostrPubkey) {
+                  saveSettings({ nostrPubkey: result.data.pubkey }).catch(() => {});
+                }
+              }
+              sendResponse(result);
             })
             .catch((err) => sendResponse({ ok: false, error: err.message }));
           return true;
         }
 
         case MessageType.GET_CONFIRM_DATA: {
-          // Return settings + recording metadata + signer status
+          // Light probe only — never call getPublicKey() here. It opens a signer
+          // popup on the recording tab that the user can't see or interact with
+          // (they're on the review tab). The pubkey comes from settings, auto-
+          // populated after the first successful signEvent.
           Promise.all([
             getSettings(),
             findScriptableTab().then((tabId) =>
-              tabId ? probeNip07Direct(tabId) : { error: 'No web tab available' },
-            ).catch((err) => ({ error: err.message })),
+              tabId ? probeNip07Exists(tabId) : { error: 'No web tab available' },
+            ).catch((err: any) => ({ error: err.message })),
           ])
             .then(([settings, signerResult]) => {
-              const npub = 'pubkey' in signerResult ? signerResult.pubkey : null;
+              const signerAvailable = 'available' in signerResult;
+              const npub = settings.nostrPubkey || null;
               const bridgeError = 'error' in signerResult ? signerResult.error : null;
               sendResponse({
                 server: settings.blossomServers[0] || 'https://blossom.band',
@@ -549,8 +599,8 @@ export default defineBackground(() => {
                 fileSize: lastRecordingMeta?.size ?? 0,
                 duration: lastRecordingMeta?.duration ?? 0,
                 npub,
-                signerAvailable: !!npub,
-                bridgeError,
+                signerAvailable,
+                bridgeError: signerAvailable ? null : bridgeError,
               });
             })
             .catch((err) => {

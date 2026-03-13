@@ -75,20 +75,30 @@
    ========================================== */
 .flora-webcam {
   position: fixed;
-  width: 120px;
-  height: 120px;
+  overflow: visible;
+  z-index: 2147483646;
+  cursor: grab;
+  display: none;
+  pointer-events: auto;
+  transition: width var(--fl-duration-normal) var(--fl-ease),
+              height var(--fl-duration-normal) var(--fl-ease);
+}
+
+/* Size presets — medium is default */
+.flora-webcam.size-sm { width: 128px; height: 128px; }
+.flora-webcam.size-md { width: 200px; height: 200px; }
+.flora-webcam.size-lg { width: 300px; height: 300px; }
+
+/* Inner mask — clips video to circle */
+.flora-webcam-mask {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: var(--fl-shadow-md);
-  z-index: 2147483646;
-  cursor: grab;
   background: var(--fl-bg-base);
-  display: none;
-  pointer-events: auto;
-  /* Use transform for snap animation, not layout properties */
-  transition: transform var(--fl-duration-normal) var(--fl-ease),
-              opacity var(--fl-duration-normal) var(--fl-ease);
+  position: relative;
 }
 
 .flora-webcam.dragging {
@@ -96,12 +106,84 @@
   transition: none !important;
 }
 
+/* Size selector — appears on hover, lives outside the circle clip */
+.flora-size-selector {
+  position: absolute;
+  bottom: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 15, 15, 0.92);
+  border: 1px solid var(--fl-border-muted);
+  border-radius: var(--fl-radius-pill);
+  padding: 5px 8px;
+  z-index: 2;
+  pointer-events: auto;
+}
 
-/* Corner snap positions */
-.flora-webcam.pos-bl { bottom: 80px; left: 24px; right: auto; top: auto; }
-.flora-webcam.pos-br { bottom: 80px; right: 24px; left: auto; top: auto; }
-.flora-webcam.pos-tl { top: 24px; left: 24px; right: auto; bottom: auto; }
-.flora-webcam.pos-tr { top: 24px; right: 24px; left: auto; bottom: auto; }
+.flora-size-selector.flip-above {
+  bottom: auto;
+  top: -36px;
+}
+
+/* When selector flips above, bridge the gap above instead */
+.flora-webcam:has(.flora-size-selector.flip-above)::after {
+  bottom: auto;
+  top: -40px;
+}
+
+/* Bridge hover gap: invisible hit area extends below the bubble so the mouse
+   can travel from the circle to the selector without leaving :hover */
+.flora-webcam::after {
+  content: '';
+  position: absolute;
+  bottom: -40px;
+  left: 0;
+  right: 0;
+  height: 40px;
+}
+
+.flora-webcam:hover .flora-size-selector {
+  display: flex;
+}
+
+.flora-webcam.dragging .flora-size-selector {
+  display: none !important;
+}
+
+/* Size dots — visual circles of increasing size, no text */
+.flora-size-btn {
+  border-radius: 50%;
+  border: 2px solid var(--fl-text-muted);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--fl-duration-fast), background var(--fl-duration-fast);
+  /* Expand tap target to 28px without changing visual size */
+  position: relative;
+}
+
+.flora-size-btn::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+}
+
+.flora-size-btn[data-size="sm"] { width: 10px; height: 10px; }
+.flora-size-btn[data-size="md"] { width: 14px; height: 14px; }
+.flora-size-btn[data-size="lg"] { width: 18px; height: 18px; }
+
+.flora-size-btn:hover {
+  border-color: var(--fl-text-primary);
+}
+
+.flora-size-btn.active {
+  background: var(--fl-accent);
+  border-color: var(--fl-accent);
+}
 
 .flora-webcam video {
   width: 100%;
@@ -284,6 +366,12 @@
 .flora-btn-stop:focus-visible {
   outline: 2px solid var(--fl-accent);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flora-webcam {
+    transition: none;
+  }
 }
 
 /* Review overlay styles removed — preview now opens in review.html tab */

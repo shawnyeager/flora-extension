@@ -1,6 +1,7 @@
 import { getSettings, saveSettings } from '@/utils/settings';
 import { MessageType } from '@/utils/messages';
 import { Icons } from '@/utils/icons';
+import { npubEncode, decode } from 'nostr-tools/nip19';
 
 // --- DOM refs ---
 
@@ -14,10 +15,10 @@ const relayList = document.getElementById('relay-list') as HTMLUListElement;
 
 const publishToggle = document.getElementById('publish-toggle') as HTMLInputElement;
 
+const npubInput = document.getElementById('npub-input') as HTMLInputElement;
+const npubError = document.getElementById('npub-error') as HTMLDivElement;
 const identityDot = document.querySelector('.identity-dot') as HTMLElement;
 const identityLabel = document.querySelector('.identity-label') as HTMLElement;
-const identityNpub = document.querySelector('.identity-npub') as HTMLElement;
-const identityCopy = document.querySelector('.identity-copy') as HTMLButtonElement;
 
 // --- Helpers ---
 
@@ -218,13 +219,56 @@ publishToggle.addEventListener('change', async () => {
   showSaved();
 });
 
-// --- Identity ---
+// --- Identity (npub input + signer detection) ---
 
-async function detectIdentity() {
-  identityLabel.textContent = 'Checking\u2026';
+/** Parse npub1... or 64-char hex into hex pubkey. Returns null if invalid. */
+function parseNpub(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return ''; // empty = clear
+
+  // 64-char hex pubkey
+  if (/^[0-9a-f]{64}$/i.test(trimmed)) return trimmed.toLowerCase();
+
+  // npub1... bech32
+  if (trimmed.startsWith('npub1')) {
+    try {
+      const { type, data } = decode(trimmed);
+      if (type === 'npub') return data as string;
+    } catch { /* invalid bech32 */ }
+  }
+
+  return null; // not a valid pubkey
+}
+
+let npubSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+npubInput.addEventListener('input', () => {
+  npubInput.classList.remove('invalid');
+  npubError.classList.remove('visible');
+
+  // Debounce save
+  if (npubSaveTimeout) clearTimeout(npubSaveTimeout);
+  npubSaveTimeout = setTimeout(async () => {
+    const hex = parseNpub(npubInput.value);
+    if (hex === null) {
+      npubInput.classList.add('invalid');
+      npubError.textContent = 'Enter a valid npub1... or 64-char hex pubkey';
+      npubError.classList.add('visible');
+      return;
+    }
+    await saveSettings({ nostrPubkey: hex });
+    if (hex) showSaved();
+  }, 400);
+});
+
+npubInput.addEventListener('paste', () => {
+  // Re-trigger validation immediately on paste
+  setTimeout(() => npubInput.dispatchEvent(new Event('input')), 0);
+});
+
+async function detectSigner() {
+  identityLabel.textContent = 'Checking signer\u2026';
   identityDot.className = 'identity-dot';
-  identityNpub.textContent = '';
-  identityCopy.hidden = true;
 
   let result: any;
   try {
@@ -233,23 +277,21 @@ async function detectIdentity() {
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
     ]);
   } catch {
-    showIdentityMissing();
+    showSignerMissing();
     return;
   }
 
   if (result && typeof result === 'object' && 'detected' in result) {
     identityDot.classList.add('connected');
-    identityLabel.textContent = 'Signer detected \u2014 your pubkey will be confirmed before signing';
+    identityLabel.textContent = 'NIP-07 signer detected';
   } else {
-    showIdentityMissing();
+    showSignerMissing();
   }
 }
 
-function showIdentityMissing() {
+function showSignerMissing() {
   identityDot.classList.add('missing');
   identityLabel.textContent = 'No signer found \u2014 install nos2x or Alby to sign events';
-  identityNpub.textContent = '';
-  identityCopy.hidden = true;
 }
 
 // --- Load ---
@@ -261,10 +303,19 @@ async function load() {
   publishToggle.checked = settings.publishToNostr;
   renderServers();
   renderRelays();
+
+  // Show stored pubkey as npub1... in the input
+  if (settings.nostrPubkey) {
+    try {
+      npubInput.value = npubEncode(settings.nostrPubkey);
+    } catch {
+      npubInput.value = settings.nostrPubkey;
+    }
+  }
 }
 
 load();
-detectIdentity();
+detectSigner();
 
 // Dynamic version from manifest
 document.getElementById('about-version')!.textContent = `Flora v${browser.runtime.getManifest().version}`;

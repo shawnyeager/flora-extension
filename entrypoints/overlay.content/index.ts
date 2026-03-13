@@ -27,19 +27,69 @@ export default defineContentScript({
     // Webcam
     let webcamOn = true;
 
+    // Bubble size & position
+    type BubbleSize = 'sm' | 'md' | 'lg';
+    let bubbleSize: BubbleSize = 'md';
+    // Position as viewport percentages (0–1) for window-size independence
+    let bubblePosXPct = 0.02; // default: near left edge
+    let bubblePosYPct = 0.82; // default: near bottom
+
+    const BUBBLE_SIZES: Record<BubbleSize, number> = { sm: 128, md: 200, lg: 300 };
+
     // Drag
-    type Corner = 'bl' | 'br' | 'tl' | 'tr';
-    let bubbleCorner: Corner = 'bl';
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
     let bubbleStartRect: DOMRect | null = null;
+
+    // Restore saved prefs before building UI
+    try {
+      const saved = await browser.storage.local.get(['bubbleSize', 'bubblePosition']);
+      if (saved.bubbleSize && (saved.bubbleSize as string) in BUBBLE_SIZES) {
+        bubbleSize = saved.bubbleSize as BubbleSize;
+      }
+      if (saved.bubblePosition) {
+        const pos = saved.bubblePosition as { xPct?: number; yPct?: number };
+        bubblePosXPct = pos.xPct ?? bubblePosXPct;
+        bubblePosYPct = pos.yPct ?? bubblePosYPct;
+      }
+    } catch { /* storage may not be available */ }
 
     ctx.onInvalidated(() => {
       webcamAborted = true;
       webcamStream?.getTracks().forEach((t) => t.stop());
       webcamStream = null;
     });
+
+    // ==========================================
+    // Bubble position helpers
+    // ==========================================
+    function applyBubblePosition(el: HTMLElement) {
+      const size = BUBBLE_SIZES[bubbleSize];
+      const x = Math.max(0, Math.min(bubblePosXPct * window.innerWidth, window.innerWidth - size));
+      const y = Math.max(0, Math.min(bubblePosYPct * window.innerHeight, window.innerHeight - size));
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    }
+
+    function clampAndSavePosition(el: HTMLElement) {
+      const size = BUBBLE_SIZES[bubbleSize];
+      const x = Math.max(0, Math.min(parseFloat(el.style.left) || 0, window.innerWidth - size));
+      const y = Math.max(0, Math.min(parseFloat(el.style.top) || 0, window.innerHeight - size));
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      bubblePosXPct = x / window.innerWidth;
+      bubblePosYPct = y / window.innerHeight;
+    }
+
+    function saveBubblePrefs() {
+      browser.storage.local.set({
+        bubbleSize,
+        bubblePosition: { xPct: bubblePosXPct, yPct: bubblePosYPct },
+      }).catch(() => {});
+    }
 
     // ==========================================
     // Shadow Root UI
@@ -58,9 +108,14 @@ export default defineContentScript({
 
         // --- Webcam bubble ---
         const webcamBubble = document.createElement('div');
-        webcamBubble.className = 'flora-webcam pos-bl';
+        webcamBubble.className = `flora-webcam size-${bubbleSize}`;
         webcamBubble.setAttribute('role', 'region');
         webcamBubble.setAttribute('aria-label', 'Webcam preview');
+        applyBubblePosition(webcamBubble);
+
+        // Inner mask — clips video to circle, allows size selector to overflow
+        const mask = document.createElement('div');
+        mask.className = 'flora-webcam-mask';
 
         const webcamVideoEl = document.createElement('video');
         webcamVideoEl.autoplay = true;
@@ -71,6 +126,41 @@ export default defineContentScript({
         const webcamOff = document.createElement('div');
         webcamOff.className = 'flora-webcam-off';
         webcamOff.innerHTML = Icons.cameraOff;
+
+        mask.append(webcamVideoEl, webcamOff);
+
+        // --- Size selector (visual dots on hover) ---
+        const sizeSelector = document.createElement('div');
+        sizeSelector.className = 'flora-size-selector';
+        const sizeLabels: Record<BubbleSize, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
+        for (const s of ['sm', 'md', 'lg'] as BubbleSize[]) {
+          const btn = document.createElement('button');
+          btn.className = `flora-size-btn${s === bubbleSize ? ' active' : ''}`;
+          btn.setAttribute('data-size', s);
+          btn.setAttribute('aria-label', `${sizeLabels[s]} bubble`);
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (s === bubbleSize) return;
+            webcamBubble.classList.remove(`size-${bubbleSize}`);
+            bubbleSize = s;
+            webcamBubble.classList.add(`size-${bubbleSize}`);
+            sizeSelector.querySelectorAll('.flora-size-btn').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            clampAndSavePosition(webcamBubble);
+            saveBubblePrefs();
+          });
+          sizeSelector.append(btn);
+        }
+
+        // Flip size selector above if near bottom edge
+        webcamBubble.addEventListener('mouseenter', () => {
+          const rect = webcamBubble.getBoundingClientRect();
+          if (rect.bottom + 40 > window.innerHeight) {
+            sizeSelector.classList.add('flip-above');
+          } else {
+            sizeSelector.classList.remove('flip-above');
+          }
+        });
 
         // Camera toggle badge
         const camToggle = document.createElement('button');
@@ -96,15 +186,15 @@ export default defineContentScript({
           }
         });
 
-        // --- Drag handlers ---
+        // --- Drag handlers (free positioning, no corner snapping) ---
         webcamBubble.addEventListener('pointerdown', (e: PointerEvent) => {
-          if ((e.target as HTMLElement).closest('.flora-webcam-toggle')) return;
+          if ((e.target as HTMLElement).closest('.flora-webcam-toggle') ||
+              (e.target as HTMLElement).closest('.flora-size-selector')) return;
           isDragging = true;
           dragStartX = e.clientX;
           dragStartY = e.clientY;
           bubbleStartRect = webcamBubble.getBoundingClientRect();
           webcamBubble.classList.add('dragging');
-          webcamBubble.classList.remove('pos-bl', 'pos-br', 'pos-tl', 'pos-tr');
           webcamBubble.style.top = `${bubbleStartRect.top}px`;
           webcamBubble.style.left = `${bubbleStartRect.left}px`;
           webcamBubble.style.right = 'auto';
@@ -128,20 +218,22 @@ export default defineContentScript({
           isDragging = false;
           webcamBubble.classList.remove('dragging');
           webcamBubble.releasePointerCapture(e.pointerId);
-          const rect = webcamBubble.getBoundingClientRect();
-          const cx = rect.left + rect.width / 2;
-          const cy = rect.top + rect.height / 2;
-          const isLeft = cx < window.innerWidth / 2;
-          const isTop = cy < window.innerHeight / 2;
-          bubbleCorner = ((isTop ? 't' : 'b') + (isLeft ? 'l' : 'r')) as Corner;
-          webcamBubble.style.top = '';
-          webcamBubble.style.left = '';
-          webcamBubble.style.right = '';
-          webcamBubble.style.bottom = '';
-          webcamBubble.classList.add(`pos-${bubbleCorner}`);
+          // Stay where dropped — save position as viewport percentages
+          const left = parseFloat(webcamBubble.style.left) || 0;
+          const top = parseFloat(webcamBubble.style.top) || 0;
+          bubblePosXPct = left / window.innerWidth;
+          bubblePosYPct = top / window.innerHeight;
+          saveBubblePrefs();
         });
 
-        webcamBubble.append(webcamVideoEl, webcamOff, camToggle);
+        // Re-clamp on window resize
+        window.addEventListener('resize', () => {
+          if (webcamBubble.style.display !== 'none') {
+            applyBubblePosition(webcamBubble);
+          }
+        });
+
+        webcamBubble.append(mask, sizeSelector, camToggle);
 
         // --- Controls bar ---
         const controls = document.createElement('div');
@@ -341,7 +433,6 @@ export default defineContentScript({
       } else {
         // All other states: clean up the recording overlay
         stopEverything();
-        // videoLoaded cleanup now handled by review.html
       }
     }
 

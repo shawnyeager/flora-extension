@@ -16,18 +16,17 @@
       </div>
     </header>
 
-    <!-- Identity (read-only) -->
+    <!-- Identity -->
     <section class="section" id="identity-section">
       <h2 class="section-title">Nostr Identity</h2>
-      <div id="identity" class="identity-card">
-        <div class="identity-status">
-          <span class="identity-dot"></span>
-          <span class="identity-label">Checking&hellip;</span>
-        </div>
-        <div class="identity-pubkey" id="identity-pubkey">
-          <span class="identity-npub"></span>
-          <button class="identity-copy" aria-label="Copy public key" title="Copy public key" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
-        </div>
+      <p class="section-hint">Your public key, shown on the review page. Paste your npub or hex pubkey.</p>
+      <div class="npub-input-row">
+        <input type="text" id="npub-input" class="npub-input" placeholder="npub1..." spellcheck="false" autocomplete="off">
+      </div>
+      <div class="npub-error" id="npub-error" role="alert"></div>
+      <div class="identity-signer" id="identity-signer">
+        <span class="identity-dot"></span>
+        <span class="identity-label">Checking signer&hellip;</span>
       </div>
     </section>
 

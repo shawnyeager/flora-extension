@@ -25,6 +25,7 @@ let recordingStartTime = 0;
 let isPaused = false;
 let pauseStartTime = 0;
 let totalPausedMs = 0;
+let isStopping = false;
 
 async function startCapture() {
   try {
@@ -160,7 +161,8 @@ async function startCapture() {
 }
 
 async function stopCapture() {
-  if (!output || !target) return;
+  if (isStopping || !output || !target) return;
+  isStopping = true;
 
   // Stop media tracks FIRST (immediately kills screen share indicator + mic)
   displayStream?.getTracks().forEach((t) => t.stop());
@@ -200,6 +202,7 @@ async function stopCapture() {
       error: err instanceof Error ? err.message : String(err),
     });
   } finally {
+    isStopping = false;
     cleanup();
   }
 }
@@ -229,6 +232,7 @@ function cleanup() {
   audioSource = null;
   output = null;
   target = null;
+  isStopping = false;
 }
 
 function generateThumbnail(buffer: ArrayBuffer): Promise<string> {
@@ -682,9 +686,6 @@ browser.runtime.onMessage.addListener(
         return false;
 
       case MessageType.STOP_CAPTURE:
-        // Stop media tracks synchronously in handler (kills screen share indicator immediately)
-        displayStream?.getTracks().forEach((t) => t.stop());
-        micStream?.getTracks().forEach((t) => t.stop());
         stopCapture();
         sendResponse({ ok: true });
         return false;

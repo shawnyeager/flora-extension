@@ -213,18 +213,25 @@ function renderSignerStatus(
   actionBtn: HTMLButtonElement,
 ) {
   warningEl.style.display = 'none';
-  if (data.signerAvailable && data.npub) {
+
+  // Show identity row only when we have a pubkey, hide it otherwise
+  const identityField = identityEl.closest('.field') as HTMLElement | null;
+  if (data.npub) {
     identityEl.textContent = truncateKey(data.npub);
-    actionBtn.disabled = false;
+    if (identityField) identityField.style.display = '';
   } else {
     identityEl.textContent = '';
-    const errDetail = data.bridgeError || 'Unknown error';
+    if (identityField) identityField.style.display = 'none';
+  }
 
-    warningEl.textContent = '';
+  if (data.signerAvailable) {
+    actionBtn.disabled = false;
+  } else {
+    // Signer not found — show warning and retry button
     while (warningEl.firstChild) warningEl.firstChild.remove();
 
     const msg = document.createElement('div');
-    msg.textContent = `Signer error: ${errDetail}`;
+    msg.textContent = `Signer: ${data.bridgeError || 'Not detected'}`;
     warningEl.append(msg);
 
     const retryBtn = document.createElement('button');

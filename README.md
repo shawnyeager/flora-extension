@@ -18,10 +18,12 @@ Flora is a Chrome extension for fast, frictionless screen recording on decentral
 ## Features
 
 - **Screen recording** with system audio, microphone, and optional webcam overlay
+- **Webcam bubble** — resizable (S/M/L), free-drag anywhere on screen, persisted position and size
 - **WebCodecs encoding** — hardware-accelerated MP4 output (AV1 > VP9 > H.264 fallback)
 - **Blossom upload** — recordings stored on decentralized file servers
 - **Nostr publishing** — optionally publish a note with your recording link to configured relays
 - **NIP-07 signing** — uses your existing Nostr signer extension (Nos2x, Alby, etc.)
+- **Identity management** — enter your npub in settings; auto-populated after first signing
 - **Recording library** — browse, replay, re-upload, and manage past recordings locally
 - **Configurable destinations** — choose your own Blossom servers and Nostr relays
 - **Dark mode only** — designed to look good, not generic
@@ -70,7 +72,7 @@ Open the settings page from the popup menu to configure:
 
 ### NIP-07 Signing
 
-Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work.
+Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as an npub in Settings.
 
 ## Development
 
@@ -112,7 +114,7 @@ npm run build:firefox   # production build
 Version lives in `package.json`. Everything else reads from it automatically.
 
 ```bash
-npm version patch          # bump 0.1.1 → 0.1.2 (auto-commits + tags)
+npm version patch          # bump 0.2.0 → 0.2.1 (auto-commits + tags)
 git push origin master --tags   # CI builds zip + creates GitHub release
 ```
 
