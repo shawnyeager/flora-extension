@@ -117,14 +117,19 @@ async function hasOffscreenDocument(): Promise<boolean> {
   return contexts.length > 0;
 }
 
+let offscreenCreating: Promise<void> | null = null;
+
 async function ensureOffscreenDocument() {
   if (await hasOffscreenDocument()) return;
+  if (offscreenCreating) return offscreenCreating;
 
-  await (browser as any).offscreen.createDocument({
+  offscreenCreating = (browser as any).offscreen.createDocument({
     url: OFFSCREEN_PATH,
     reasons: ['DISPLAY_MEDIA', 'USER_MEDIA'],
     justification: 'Screen recording with WebCodecs encoding',
-  });
+  }).finally(() => { offscreenCreating = null; });
+
+  return offscreenCreating;
 }
 
 async function closeOffscreenDocument() {
@@ -467,17 +472,18 @@ export default defineBackground(() => {
           const msg = message as any;
           console.log(`[background] published note: ${msg.noteId}`);
           publishResult = { noteId: msg.noteId, blossomUrl: msg.blossomUrl };
-          // Update IDB record with noteId
-          if (uploadResult) {
-            browser.runtime.sendMessage({
-              type: MessageType.MARK_UPLOADED,
-              target: 'offscreen',
-              hash: uploadResult.sha256,
-              blossomUrl: uploadResult.url,
-              noteId: msg.noteId,
-            }).catch(() => {});
-          }
-          setState('complete');
+          // Update IDB record with noteId BEFORE transitioning state,
+          // so recordings page reads the noteId when it reloads on 'complete'
+          const markDone = uploadResult
+            ? browser.runtime.sendMessage({
+                type: MessageType.MARK_UPLOADED,
+                target: 'offscreen',
+                hash: uploadResult.sha256,
+                blossomUrl: uploadResult.url,
+                noteId: msg.noteId,
+              }).catch(() => {})
+            : Promise.resolve();
+          markDone.then(() => setState('complete'));
           return false;
         }
 
