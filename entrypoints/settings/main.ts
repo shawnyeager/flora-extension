@@ -265,3 +265,6 @@ async function load() {
 
 load();
 detectIdentity();
+
+// Dynamic version from manifest
+document.getElementById('about-version')!.textContent = `Flora v${browser.runtime.getManifest().version}`;

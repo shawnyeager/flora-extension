@@ -467,17 +467,18 @@ export default defineBackground(() => {
           const msg = message as any;
           console.log(`[background] published note: ${msg.noteId}`);
           publishResult = { noteId: msg.noteId, blossomUrl: msg.blossomUrl };
-          // Update IDB record with noteId
-          if (uploadResult) {
-            browser.runtime.sendMessage({
-              type: MessageType.MARK_UPLOADED,
-              target: 'offscreen',
-              hash: uploadResult.sha256,
-              blossomUrl: uploadResult.url,
-              noteId: msg.noteId,
-            }).catch(() => {});
-          }
-          setState('complete');
+          // Update IDB record with noteId BEFORE transitioning state,
+          // so recordings page reads the noteId when it reloads on 'complete'
+          const markDone = uploadResult
+            ? browser.runtime.sendMessage({
+                type: MessageType.MARK_UPLOADED,
+                target: 'offscreen',
+                hash: uploadResult.sha256,
+                blossomUrl: uploadResult.url,
+                noteId: msg.noteId,
+              }).catch(() => {})
+            : Promise.resolve();
+          markDone.then(() => setState('complete'));
           return false;
         }
 
