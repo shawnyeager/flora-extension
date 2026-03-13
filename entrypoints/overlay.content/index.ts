@@ -288,6 +288,12 @@ export default defineContentScript({
       webcamAborted = false;
       webcamAcquiring = true;
       try {
+        // Check permissions policy before calling getUserMedia to avoid
+        // "Permissions policy violation: camera is not allowed" errors on
+        // pages that set a restrictive Permissions-Policy header.
+        const perm = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (perm.state === 'denied') throw new Error('camera denied by permissions policy');
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
         });
