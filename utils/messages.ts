@@ -78,6 +78,9 @@ export const MessageType = {
   OVERLAY_SHOW: 'overlay_show',
   OVERLAY_HIDE: 'overlay_hide',
   OVERLAY_CORNER_CHANGED: 'overlay_corner_changed',
+
+  // Tab capture switching
+  SWITCH_TAB_CAPTURE: 'switch_tab_capture',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -117,6 +120,7 @@ export interface ResetStateMessage extends BaseMessage {
 export interface StartCaptureMessage extends BaseMessage {
   type: typeof MessageType.START_CAPTURE;
   target: 'offscreen';
+  streamId: string;
 }
 
 export interface StopCaptureMessage extends BaseMessage {
@@ -328,6 +332,12 @@ export interface OverlayCornerChangedMessage extends BaseMessage {
   corner: string;
 }
 
+export interface SwitchTabCaptureMessage extends BaseMessage {
+  type: typeof MessageType.SWITCH_TAB_CAPTURE;
+  target: 'offscreen';
+  streamId: string;
+}
+
 export interface RecordingControlsState {
   paused: boolean;
   micMuted: boolean;
@@ -380,4 +390,5 @@ export type Message =
   | OpenSettingsMessage
   | OverlayShowMessage
   | OverlayHideMessage
-  | OverlayCornerChangedMessage;
+  | OverlayCornerChangedMessage
+  | SwitchTabCaptureMessage;

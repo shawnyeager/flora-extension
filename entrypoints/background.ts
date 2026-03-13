@@ -132,7 +132,7 @@ async function ensureOffscreenDocument() {
 
   offscreenCreating = (browser as any).offscreen.createDocument({
     url: OFFSCREEN_PATH,
-    reasons: ['DISPLAY_MEDIA', 'USER_MEDIA'],
+    reasons: ['USER_MEDIA'],
     justification: 'Screen recording with WebCodecs encoding',
   }).finally(() => { offscreenCreating = null; });
 
@@ -204,26 +204,47 @@ function isRecordingActive(state: ExtensionState): boolean {
   return ['awaiting_media', 'countdown', 'recording'].includes(state);
 }
 
+async function getTabStreamId(tabId: number): Promise<string | null> {
+  try {
+    return await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  } catch (err) {
+    console.warn('[background] getMediaStreamId failed for tab', tabId, err);
+    return null;
+  }
+}
+
 export default defineBackground(() => {
   console.log('[background] service worker started');
 
   browser.tabs.onActivated.addListener(async (activeInfo) => {
     if (!isRecordingActive(currentState)) return;
 
-    // Skip non-http tabs (chrome://, extensions) — keep overlay on last valid tab
+    // Skip non-http tabs (chrome://, extensions) — keep overlay and capture on last valid tab
     const tab = await browser.tabs.get(activeInfo.tabId).catch(() => null);
     if (!tab?.url || !/^https?:/.test(tab.url)) return;
 
     overlayTabId = activeInfo.tabId;
 
-    // Don't send OVERLAY_HIDE to the old tab. The bubble stays visible there
-    // (important for tab capture — hiding it removes webcam from the recording).
-    // Just send OVERLAY_SHOW to the new tab so it also gets a bubble.
+    // Show overlay on new tab
     browser.tabs.sendMessage(activeInfo.tabId, {
       type: MessageType.OVERLAY_SHOW,
       webcamOn: controlsState.webcamOn,
       corner: overlayCorner,
     }).catch(() => {});
+
+    // Switch recording capture to the new tab
+    const streamId = await getTabStreamId(activeInfo.tabId);
+    if (!streamId) {
+      console.warn('[background] skipping tab capture switch — getMediaStreamId failed');
+      return;
+    }
+    browser.runtime.sendMessage({
+      type: MessageType.SWITCH_TAB_CAPTURE,
+      target: 'offscreen',
+      streamId,
+    }).catch((err) => {
+      console.error('[background] SWITCH_TAB_CAPTURE failed:', err);
+    });
   });
 
   // Reset state on startup (storage.local persists, so clear stale state)
@@ -312,19 +333,27 @@ export default defineBackground(() => {
         case MessageType.START_RECORDING: {
           setState('initializing');
 
-          // Identify the active tab first, then proceed with offscreen setup.
-          // overlayTabId must be set before setState('awaiting_media') so the
-          // OVERLAY_SHOW message targets the correct tab.
-          browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+          // Identify the active tab, acquire a tab capture stream ID, then start.
+          browser.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
             recordingTabId = tab?.id ?? null;
             overlayTabId = recordingTabId;
             browser.storage.local.set({ recordingTabId });
 
+            // Get tab capture stream ID (user gesture from popup click is still active)
+            const streamId = recordingTabId
+              ? await getTabStreamId(recordingTabId)
+              : null;
+
+            if (!streamId) {
+              console.error('[background] could not get streamId for tab', recordingTabId);
+              setState('idle');
+              return;
+            }
+
             return ensureOffscreenDocument().then(() => {
               setState('awaiting_media');
 
-              // Send OVERLAY_SHOW only to the recording tab (not broadcast).
-              // This starts the webcam preview on the active tab only.
+              // Show webcam overlay on the recording tab only
               if (overlayTabId) {
                 browser.tabs.sendMessage(overlayTabId, {
                   type: MessageType.OVERLAY_SHOW,
@@ -336,6 +365,7 @@ export default defineBackground(() => {
               return browser.runtime.sendMessage({
                 type: MessageType.START_CAPTURE,
                 target: 'offscreen',
+                streamId,
               });
             });
           }).catch((err) => {

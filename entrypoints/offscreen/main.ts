@@ -15,30 +15,65 @@ import { SimplePool } from 'nostr-tools/pool';
 
 console.log('[offscreen] document loaded');
 
+// --- Recording pipeline state ---
 let output: Output | null = null;
 let videoSource: MediaStreamVideoTrackSource | null = null;
 let audioSource: MediaStreamAudioTrackSource | null = null;
 let target: BufferTarget | null = null;
-let displayStream: MediaStream | null = null;
 let micStream: MediaStream | null = null;
 let recordingStartTime = 0;
 let isPaused = false;
 let pauseStartTime = 0;
 let totalPausedMs = 0;
 
-async function startCapture() {
-  try {
-    // 1. Acquire screen capture (webcam overlay comes from content script on the page)
-    displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30 } },
-      audio: true,
-    });
+// --- Tab capture + canvas proxy state ---
+let captureStream: MediaStream | null = null;
+let proxyVideo: HTMLVideoElement | null = null;
+let proxyCanvas: HTMLCanvasElement | null = null;
+let proxyCtx: CanvasRenderingContext2D | null = null;
+let drawLoopHandle: ReturnType<typeof setInterval> | null = null;
 
-    const videoTrack = displayStream.getVideoTracks()[0];
-    if (!videoTrack) throw new Error('No video track from getDisplayMedia');
+// --- Audio mixer state (hot-swappable tab audio) ---
+let audioCtx: AudioContext | null = null;
+let audioDestNode: MediaStreamAudioDestinationNode | null = null;
+let tabAudioGain: GainNode | null = null;
+let tabAudioSourceNode: MediaStreamAudioSourceNode | null = null;
+let micGain: GainNode | null = null;
+
+// --- Helpers ---
+
+async function getUserMediaForTab(streamId: string): Promise<MediaStream> {
+  // Chrome-specific mandatory constraints for tab capture — not in the DOM lib
+  const constraints = {
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: streamId,
+      },
+    },
+    audio: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: streamId,
+      },
+    },
+  } as unknown as MediaStreamConstraints;
+
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+
+// --- Capture lifecycle ---
+
+async function startCapture(streamId: string) {
+  try {
+    // 1. Acquire tab capture via stream ID from chrome.tabCapture.getMediaStreamId
+    captureStream = await getUserMediaForTab(streamId);
+
+    const videoTrack = captureStream.getVideoTracks()[0];
+    if (!videoTrack) throw new Error('No video track from tab capture');
     videoTrack.contentHint = 'detail';
 
-    // 2. Acquire microphone
+    // 2. Acquire microphone (unchanged)
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -47,20 +82,76 @@ async function startCapture() {
       console.warn('[offscreen] mic not available, recording without mic:', err);
     }
 
-    // 3. Detect codecs at actual capture resolution
+    // 3. Set up canvas proxy — mediabunny reads from this continuous track
+    //    while we swap the underlying capture source on tab switches
     const trackSettings = videoTrack.getSettings();
     const captureWidth = trackSettings.width ?? 1920;
     const captureHeight = trackSettings.height ?? 1080;
 
+    proxyCanvas = document.createElement('canvas');
+    proxyCanvas.width = captureWidth;
+    proxyCanvas.height = captureHeight;
+    proxyCtx = proxyCanvas.getContext('2d', { alpha: false })!;
+
+    proxyVideo = document.createElement('video');
+    proxyVideo.muted = true;
+    proxyVideo.srcObject = new MediaStream([videoTrack]);
+    // Must be in DOM for Chrome to decode frames in offscreen doc
+    proxyVideo.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0;pointer-events:none';
+    document.body.appendChild(proxyVideo);
+    await proxyVideo.play();
+
+    // Draw loop at ~30fps
+    drawLoopHandle = setInterval(() => {
+      if (!proxyCtx || !proxyVideo || proxyVideo.readyState < 2) return;
+      // Handle resolution changes between tabs
+      if (
+        proxyVideo.videoWidth > 0 &&
+        (proxyCanvas!.width !== proxyVideo.videoWidth || proxyCanvas!.height !== proxyVideo.videoHeight)
+      ) {
+        proxyCanvas!.width = proxyVideo.videoWidth;
+        proxyCanvas!.height = proxyVideo.videoHeight;
+      }
+      proxyCtx.drawImage(proxyVideo, 0, 0, proxyCanvas!.width, proxyCanvas!.height);
+    }, 33);
+
+    // 4. Build audio mixer — AudioContext stays alive for entire recording,
+    //    tab audio source node is disconnected/reconnected on tab switch
+    audioCtx = new AudioContext({ sampleRate: 48000 });
+    audioDestNode = audioCtx.createMediaStreamDestination();
+
+    tabAudioGain = audioCtx.createGain();
+    tabAudioGain.gain.value = 1.0;
+    tabAudioGain.connect(audioDestNode);
+
+    const tabAudioTrack = captureStream.getAudioTracks()[0];
+    if (tabAudioTrack) {
+      tabAudioSourceNode = audioCtx.createMediaStreamSource(new MediaStream([tabAudioTrack]));
+      tabAudioSourceNode.connect(tabAudioGain);
+    }
+
+    micGain = audioCtx.createGain();
+    micGain.gain.value = 1.4;
+    micGain.connect(audioDestNode);
+
+    if (micStream) {
+      const micTrack = micStream.getAudioTracks()[0];
+      if (micTrack) {
+        const micSourceNode = audioCtx.createMediaStreamSource(new MediaStream([micTrack]));
+        micSourceNode.connect(micGain);
+      }
+    }
+
+    // 5. Detect codecs at capture resolution
     const BASE_BITRATES: Record<string, number> = {
-      av1: 4_000_000,   // 2x previous — screen content needs higher bitrate
+      av1: 4_000_000,
       vp9: 5_000_000,
       avc: 8_000_000,
     };
 
     const videoCodec = await getFirstEncodableVideoCodec(
       ['av1', 'vp9', 'avc'] as VideoCodec[],
-      { width: captureWidth, height: captureHeight, bitrate: BASE_BITRATES.avc },
+      { width: proxyCanvas.width, height: proxyCanvas.height, bitrate: BASE_BITRATES.avc },
     );
     if (!videoCodec) throw new Error('No supported video codec found');
     console.log('[offscreen] selected video codec:', videoCodec);
@@ -71,17 +162,20 @@ async function startCapture() {
     );
     console.log('[offscreen] selected audio codec:', audioCodec);
 
-    // 4. Create video source with resolution-scaled bitrate
+    // 6. Resolution-scaled bitrate
     const BASE_PIXELS = 1920 * 1080;
-    const capturePixels = captureWidth * captureHeight;
+    const capturePixels = proxyCanvas.width * proxyCanvas.height;
     const pixelRatio = capturePixels / BASE_PIXELS;
-    // Sub-linear scaling: 4K (~4x pixels) gets ~3x bitrate, not 4x
     const bitrate = Math.round(BASE_BITRATES[videoCodec] * Math.pow(pixelRatio, 0.75));
 
-    console.log(`[offscreen] encoding: ${captureWidth}x${captureHeight} ${videoCodec} @ ${(bitrate / 1_000_000).toFixed(1)} Mbps`);
+    console.log(`[offscreen] encoding: ${proxyCanvas.width}x${proxyCanvas.height} ${videoCodec} @ ${(bitrate / 1_000_000).toFixed(1)} Mbps`);
+
+    // 7. Create mediabunny sources from proxy tracks (canvas video + mixed audio)
+    const canvasStream = proxyCanvas.captureStream(30);
+    const canvasVideoTrack = canvasStream.getVideoTracks()[0] as MediaStreamVideoTrack;
 
     videoSource = new MediaStreamVideoTrackSource(
-      videoTrack as MediaStreamVideoTrack,
+      canvasVideoTrack,
       {
         codec: videoCodec,
         bitrate,
@@ -98,19 +192,10 @@ async function startCapture() {
       stopCapture();
     });
 
-    // 5. Create audio source(s)
-    const audioTracks: MediaStreamTrack[] = [];
-    const systemAudioTrack = displayStream.getAudioTracks()[0];
-    if (systemAudioTrack) audioTracks.push(systemAudioTrack);
-    if (micStream) audioTracks.push(...micStream.getAudioTracks());
-
-    if (audioTracks.length > 0 && audioCodec) {
-      const mixedTrack = audioTracks.length > 1
-        ? mixAudioTracks(audioTracks)
-        : audioTracks[0];
-
+    const mixedAudioTrack = audioDestNode.stream.getAudioTracks()[0];
+    if (mixedAudioTrack && audioCodec) {
       audioSource = new MediaStreamAudioTrackSource(
-        mixedTrack as MediaStreamAudioTrack,
+        mixedAudioTrack as MediaStreamAudioTrack,
         { codec: audioCodec, bitrate: 192_000 },
       );
       audioSource.errorPromise.catch((err) => {
@@ -119,7 +204,7 @@ async function startCapture() {
       });
     }
 
-    // 6. Create output
+    // 8. Create output
     target = new BufferTarget();
     output = new Output({
       format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
@@ -137,10 +222,11 @@ async function startCapture() {
     pauseStartTime = 0;
     totalPausedMs = 0;
 
-    // Handle stream ending
+    // When the tab capture track ends (tab closed, etc.), the canvas proxy
+    // continues drawing the last frame. Background will send SWITCH_TAB_CAPTURE
+    // for the next tab, or STOP_CAPTURE when the user stops recording.
     videoTrack.addEventListener('ended', () => {
-      console.log('[offscreen] video track ended by user');
-      stopCapture();
+      console.log('[offscreen] tab capture track ended — canvas proxy continues');
     });
 
     browser.runtime.sendMessage({
@@ -148,7 +234,7 @@ async function startCapture() {
       codec: videoCodec,
     });
 
-    console.log('[offscreen] recording started');
+    console.log('[offscreen] recording started via tab capture');
   } catch (err) {
     console.error('[offscreen] capture error:', err);
     cleanup();
@@ -159,17 +245,70 @@ async function startCapture() {
   }
 }
 
+async function switchTabCapture(streamId: string) {
+  if (!proxyVideo || !proxyCanvas || !audioCtx || !tabAudioGain) {
+    console.warn('[offscreen] switchTabCapture called before recording started');
+    return;
+  }
+
+  let newStream: MediaStream;
+  try {
+    newStream = await getUserMediaForTab(streamId);
+  } catch (err) {
+    console.warn('[offscreen] switchTabCapture: getUserMedia failed, keeping current capture:', err);
+    return;
+  }
+
+  const oldStream = captureStream;
+
+  // Swap video: update hidden video's source — draw loop picks up new content
+  const newVideoTrack = newStream.getVideoTracks()[0];
+  if (newVideoTrack) {
+    proxyVideo.srcObject = new MediaStream([newVideoTrack]);
+  }
+
+  // Swap audio: disconnect old tab source, connect new one
+  if (tabAudioSourceNode) {
+    tabAudioSourceNode.disconnect();
+    tabAudioSourceNode = null;
+  }
+  const newAudioTrack = newStream.getAudioTracks()[0];
+  if (newAudioTrack) {
+    tabAudioSourceNode = audioCtx.createMediaStreamSource(new MediaStream([newAudioTrack]));
+    tabAudioSourceNode.connect(tabAudioGain);
+  }
+
+  captureStream = newStream;
+
+  // Stop old capture stream tracks (frees tab capture indicator on old tab)
+  oldStream?.getTracks().forEach((t) => t.stop());
+
+  console.log('[offscreen] switched tab capture');
+}
+
 async function stopCapture() {
   if (!output || !target) return;
 
-  // Stop media tracks FIRST (immediately kills screen share indicator + mic)
-  displayStream?.getTracks().forEach((t) => t.stop());
+  // Stop capture and mic tracks immediately
+  captureStream?.getTracks().forEach((t) => t.stop());
   micStream?.getTracks().forEach((t) => t.stop());
-  displayStream = null;
+  captureStream = null;
   micStream = null;
 
+  // Stop draw loop and proxy elements
+  if (drawLoopHandle !== null) {
+    clearInterval(drawLoopHandle);
+    drawLoopHandle = null;
+  }
+  if (proxyVideo) {
+    proxyVideo.srcObject = null;
+    proxyVideo.remove();
+    proxyVideo = null;
+  }
+  proxyCanvas = null;
+  proxyCtx = null;
+
   try {
-    // Account for paused time in duration
     if (isPaused) {
       totalPausedMs += Date.now() - pauseStartTime;
       isPaused = false;
@@ -180,6 +319,14 @@ async function stopCapture() {
     audioSource?.close();
 
     await output.finalize();
+
+    // Close AudioContext after finalization
+    await audioCtx?.close();
+    audioCtx = null;
+    audioDestNode = null;
+    tabAudioGain = null;
+    tabAudioSourceNode = null;
+    micGain = null;
 
     const buffer = target.buffer;
     if (!buffer) throw new Error('No buffer after finalization');
@@ -204,32 +351,35 @@ async function stopCapture() {
   }
 }
 
-function mixAudioTracks(tracks: MediaStreamTrack[]): MediaStreamTrack {
-  const ctx = new AudioContext({ sampleRate: 48000 });
-  const dest = ctx.createMediaStreamDestination();
-  // System audio is index 0, mic is index 1 (mic pushed last in audioTracks)
-  const micIndex = tracks.length - 1;
-
-  for (let i = 0; i < tracks.length; i++) {
-    const source = ctx.createMediaStreamSource(new MediaStream([tracks[i]]));
-    const gain = ctx.createGain();
-    gain.gain.value = i === micIndex ? 1.4 : 1.0;
-    source.connect(gain).connect(dest);
-  }
-
-  return dest.stream.getAudioTracks()[0];
-}
-
 function cleanup() {
-  displayStream?.getTracks().forEach((t) => t.stop());
+  captureStream?.getTracks().forEach((t) => t.stop());
   micStream?.getTracks().forEach((t) => t.stop());
-  displayStream = null;
+  if (drawLoopHandle !== null) {
+    clearInterval(drawLoopHandle);
+    drawLoopHandle = null;
+  }
+  if (proxyVideo) {
+    proxyVideo.srcObject = null;
+    proxyVideo.remove();
+    proxyVideo = null;
+  }
+  captureStream = null;
   micStream = null;
+  proxyCanvas = null;
+  proxyCtx = null;
   videoSource = null;
   audioSource = null;
   output = null;
   target = null;
+  audioCtx?.close().catch(() => {});
+  audioCtx = null;
+  audioDestNode = null;
+  tabAudioGain = null;
+  tabAudioSourceNode = null;
+  micGain = null;
 }
+
+// --- Thumbnail ---
 
 function generateThumbnail(buffer: ArrayBuffer): Promise<string> {
   const blob = new Blob([buffer], { type: 'video/mp4' });
@@ -264,6 +414,8 @@ function generateThumbnail(buffer: ArrayBuffer): Promise<string> {
     video.src = url;
   });
 }
+
+// --- IDB Storage ---
 
 async function storeRecording(buffer: ArrayBuffer, duration: number) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -670,22 +822,30 @@ async function publishNote(blossomUrl: string, sha256: string, size: number, rel
   }
 }
 
-// Message handler
+// --- Message handler ---
+
 browser.runtime.onMessage.addListener(
   (message: Message, _sender, sendResponse) => {
     if (message.target !== 'offscreen') return false;
 
     switch (message.type) {
       case MessageType.START_CAPTURE:
-        startCapture();
+        startCapture((message as any).streamId);
         sendResponse({ ok: true });
         return false;
 
       case MessageType.STOP_CAPTURE:
-        // Stop media tracks synchronously in handler (kills screen share indicator immediately)
-        displayStream?.getTracks().forEach((t) => t.stop());
+        // Stop capture tracks synchronously (kills screen share indicator immediately)
+        captureStream?.getTracks().forEach((t) => t.stop());
         micStream?.getTracks().forEach((t) => t.stop());
         stopCapture();
+        sendResponse({ ok: true });
+        return false;
+
+      case MessageType.SWITCH_TAB_CAPTURE:
+        switchTabCapture((message as any).streamId).catch((err) =>
+          console.error('[offscreen] switchTabCapture error:', err),
+        );
         sendResponse({ ok: true });
         return false;
 

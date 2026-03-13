@@ -10,6 +10,7 @@ export default defineConfig({
       'offscreen',
       'activeTab',
       'tabs',
+      'tabCapture',
       'storage',
       'scripting',
     ],
