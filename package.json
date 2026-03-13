@@ -1,6 +1,6 @@
 {
   "name": "flora",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Record your screen, share anywhere. Stored on Blossom, publish to Nostr.",
   "private": true,
   "type": "module",

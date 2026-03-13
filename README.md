@@ -107,6 +107,17 @@ npm run build:firefox   # production build
 | `npm run zip:firefox` | Create .zip for Firefox Add-ons |
 | `npm run compile` | TypeScript type check |
 
+### Releasing
+
+Version lives in `package.json`. Everything else reads from it automatically.
+
+```bash
+npm version patch          # bump 0.1.1 → 0.1.2 (auto-commits + tags)
+git push origin master --tags   # CI builds zip + creates GitHub release
+```
+
+Use `npm version minor` for new features (0.2.0) or `npm version major` for breaking changes (1.0.0).
+
 ## Architecture
 
 Flora runs across four Chrome extension contexts:
