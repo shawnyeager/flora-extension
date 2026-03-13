@@ -1,4 +1,4 @@
-import { MessageType, type Message, type RecordingControlsState } from '@/utils/messages';
+import { MessageType, type Message, type RecordingControlsState, type OverlayCornerChangedMessage } from '@/utils/messages';
 import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
 import { getSettings } from '@/utils/settings';
 
@@ -74,6 +74,7 @@ function setState(state: ExtensionState) {
 
   if (state === 'idle' || state === 'preview') {
     overlayTabId = null;
+    overlayCorner = 'bl';
   }
 
   // Open review.html tab for preview (or focus it if already open)
@@ -209,12 +210,12 @@ export default defineBackground(() => {
   browser.tabs.onActivated.addListener(async (activeInfo) => {
     if (!isRecordingActive(currentState)) return;
 
-    const prevTab = overlayTabId;
-    overlayTabId = activeInfo.tabId;
-
-    // Skip non-http tabs (chrome://, extensions, etc.)
+    // Skip non-http tabs (chrome://, extensions) — keep overlay on last valid tab
     const tab = await browser.tabs.get(activeInfo.tabId).catch(() => null);
     if (!tab?.url || !/^https?:/.test(tab.url)) return;
+
+    const prevTab = overlayTabId;
+    overlayTabId = activeInfo.tabId;
 
     // Hide overlay on previous tab
     if (prevTab && prevTab !== activeInfo.tabId) {
@@ -400,8 +401,9 @@ export default defineBackground(() => {
         case MessageType.TOGGLE_WEBCAM: {
           controlsState.webcamOn = !!(message as any).enabled;
           const webcamMsg = { type: MessageType.TOGGLE_WEBCAM, enabled: (message as any).enabled };
-          if (recordingTabId) {
-            browser.tabs.sendMessage(recordingTabId, webcamMsg).catch(() => {
+          const targetTab = overlayTabId || recordingTabId;
+          if (targetTab) {
+            browser.tabs.sendMessage(targetTab, webcamMsg).catch(() => {
               // Tab may have navigated — broadcast to all tabs
               browser.tabs.query({}).then((tabs) => {
                 for (const tab of tabs) {
@@ -732,7 +734,7 @@ export default defineBackground(() => {
         }
 
         case MessageType.OVERLAY_CORNER_CHANGED: {
-          overlayCorner = (message as any).corner || 'bl';
+          overlayCorner = (message as OverlayCornerChangedMessage).corner || 'bl';
           return false;
         }
 
