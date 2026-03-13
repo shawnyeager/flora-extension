@@ -12,6 +12,8 @@ let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let pendingNoteContent: string | undefined;
 let recordingTabId: number | null = null;
+let overlayTabId: number | null = null;
+let overlayCorner: string = 'bl';
 
 // Recording controls state (shared between popup and content script)
 let controlsState: RecordingControlsState = {
@@ -69,6 +71,10 @@ async function findScriptableTab(): Promise<number | null> {
 function setState(state: ExtensionState) {
   currentState = state;
   browser.storage.local.set({ state });
+
+  if (state === 'idle' || state === 'preview') {
+    overlayTabId = null;
+  }
 
   // Open review.html tab for preview (or focus it if already open)
   if (state === 'preview') {
@@ -193,8 +199,37 @@ async function signEventDirect(
   }
 }
 
+function isRecordingActive(state: ExtensionState): boolean {
+  return ['awaiting_media', 'countdown', 'recording', 'finalizing'].includes(state);
+}
+
 export default defineBackground(() => {
   console.log('[background] service worker started');
+
+  browser.tabs.onActivated.addListener(async (activeInfo) => {
+    if (!isRecordingActive(currentState)) return;
+
+    const prevTab = overlayTabId;
+    overlayTabId = activeInfo.tabId;
+
+    // Skip non-http tabs (chrome://, extensions, etc.)
+    const tab = await browser.tabs.get(activeInfo.tabId).catch(() => null);
+    if (!tab?.url || !/^https?:/.test(tab.url)) return;
+
+    // Hide overlay on previous tab
+    if (prevTab && prevTab !== activeInfo.tabId) {
+      browser.tabs.sendMessage(prevTab, {
+        type: MessageType.OVERLAY_HIDE,
+      }).catch(() => {});
+    }
+
+    // Show overlay on new tab
+    browser.tabs.sendMessage(activeInfo.tabId, {
+      type: MessageType.OVERLAY_SHOW,
+      webcamOn: controlsState.webcamOn,
+      corner: overlayCorner,
+    }).catch(() => {});
+  });
 
   // Reset state on startup (storage.local persists, so clear stale state)
   browser.storage.local.set({ state: 'idle' });
@@ -274,6 +309,7 @@ export default defineBackground(() => {
           // Track which tab the user is on — review overlay and NIP-07 happen there
           browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
             recordingTabId = tab?.id ?? null;
+            overlayTabId = recordingTabId;
             browser.storage.local.set({ recordingTabId });
           });
 
@@ -692,6 +728,11 @@ export default defineBackground(() => {
 
         case MessageType.OPEN_SETTINGS: {
           browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
+          return false;
+        }
+
+        case MessageType.OVERLAY_CORNER_CHANGED: {
+          overlayCorner = (message as any).corner || 'bl';
           return false;
         }
 

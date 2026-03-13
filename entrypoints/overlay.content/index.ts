@@ -139,6 +139,10 @@ export default defineContentScript({
           webcamBubble.style.right = '';
           webcamBubble.style.bottom = '';
           webcamBubble.classList.add(`pos-${bubbleCorner}`);
+          browser.runtime.sendMessage({
+            type: MessageType.OVERLAY_CORNER_CHANGED,
+            corner: bubbleCorner,
+          }).catch(() => {});
         });
 
         webcamBubble.append(webcamVideoEl, webcamOff, camToggle);
@@ -372,6 +376,67 @@ export default defineContentScript({
             if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
           }
         }
+        return false;
+      }
+
+      if (message.type === MessageType.OVERLAY_HIDE) {
+        webcamAborted = true;
+        webcamAcquiring = false;
+        webcamStream?.getTracks().forEach((t) => t.stop());
+        webcamStream = null;
+        const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLVideoElement;
+        if (videoEl) videoEl.srcObject = null;
+        const bubble = ui.shadow.querySelector('.flora-webcam') as HTMLElement;
+        const controls = ui.shadow.querySelector('.flora-controls') as HTMLElement;
+        if (bubble) bubble.style.display = 'none';
+        if (controls) controls.style.display = 'none';
+        stopTimer();
+        return false;
+      }
+
+      if (message.type === MessageType.OVERLAY_SHOW) {
+        const msg = message as any;
+        webcamAborted = false;
+
+        // Restore corner position
+        const corner = msg.corner || 'bl';
+        bubbleCorner = corner as Corner;
+        const bubble = ui.shadow.querySelector('.flora-webcam') as HTMLElement;
+        if (bubble) {
+          bubble.classList.remove('pos-bl', 'pos-br', 'pos-tl', 'pos-tr');
+          bubble.classList.add(`pos-${bubbleCorner}`);
+        }
+
+        // Show bubble and acquire webcam if on
+        if (msg.webcamOn) {
+          startWebcamPreview();
+        } else {
+          // Webcam off but still show bubble with camera-off indicator
+          webcamOn = false;
+          if (bubble) bubble.style.display = 'none';
+        }
+
+        // Restart timer if in recording state
+        if (currentOverlayState === 'recording' && !timerInterval) {
+          // Fetch current timer state from background
+          browser.runtime.sendMessage({ type: MessageType.GET_RECORDING_STATE }).then((state: any) => {
+            if (state) {
+              recordingStartTime = state.recordingStartedAt;
+              pausedAccumulator = state.pausedAccumulated;
+              paused = state.paused;
+              if (state.paused) pauseTimestamp = Date.now();
+              timerInterval = setInterval(() => {
+                if (paused) return;
+                const elapsed = (Date.now() - recordingStartTime - pausedAccumulator) / 1000;
+                const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const s = Math.floor(elapsed % 60).toString().padStart(2, '0');
+                const timerEl = ui.shadow.querySelector('.flora-timer') as HTMLElement;
+                if (timerEl) timerEl.textContent = `${m}:${s}`;
+              }, 1000);
+            }
+          }).catch(() => {});
+        }
+
         return false;
       }
 

@@ -73,6 +73,11 @@ export const MessageType = {
 
   // Navigation
   OPEN_SETTINGS: 'open_settings',
+
+  // Overlay tab-following
+  OVERLAY_SHOW: 'overlay_show',
+  OVERLAY_HIDE: 'overlay_hide',
+  OVERLAY_CORNER_CHANGED: 'overlay_corner_changed',
 } as const;
 
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
@@ -308,6 +313,21 @@ export interface OpenSettingsMessage extends BaseMessage {
   type: typeof MessageType.OPEN_SETTINGS;
 }
 
+export interface OverlayShowMessage extends BaseMessage {
+  type: typeof MessageType.OVERLAY_SHOW;
+  webcamOn: boolean;
+  corner: string;
+}
+
+export interface OverlayHideMessage extends BaseMessage {
+  type: typeof MessageType.OVERLAY_HIDE;
+}
+
+export interface OverlayCornerChangedMessage extends BaseMessage {
+  type: typeof MessageType.OVERLAY_CORNER_CHANGED;
+  corner: string;
+}
+
 export interface RecordingControlsState {
   paused: boolean;
   micMuted: boolean;
@@ -357,4 +377,7 @@ export type Message =
   | GenerateThumbnailMessage
   | DeleteRecordingsMessage
   | GetRecordingStateMessage
-  | OpenSettingsMessage;
+  | OpenSettingsMessage
+  | OverlayShowMessage
+  | OverlayHideMessage
+  | OverlayCornerChangedMessage;
