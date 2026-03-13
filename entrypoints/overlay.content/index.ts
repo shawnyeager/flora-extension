@@ -335,17 +335,18 @@ export default defineContentScript({
     function updateUI(state: ExtensionState) {
       currentOverlayState = state;
       if (state === 'awaiting_media') {
-        startWebcamPreview();
+        // Webcam is started by explicit OVERLAY_SHOW from background (only sent to the active tab).
+        // Don't start here — STATE_CHANGED broadcasts to ALL tabs, which would trigger
+        // getUserMedia permission prompts on every open tab.
       } else if (state === 'recording') {
         // Hide controls — they appear in the captured video. Popup has controls instead.
         const controls = ui.shadow.querySelector('.flora-controls') as HTMLElement;
         if (controls) controls.style.display = 'none';
         startTimer();
-        if (!webcamStream) startWebcamPreview();
+        // Webcam already running from OVERLAY_SHOW — don't re-acquire.
       } else {
         // All other states: clean up the recording overlay
         stopEverything();
-        // videoLoaded cleanup now handled by review.html
       }
     }
 
@@ -380,12 +381,9 @@ export default defineContentScript({
       }
 
       if (message.type === MessageType.OVERLAY_HIDE) {
-        webcamAborted = true;
-        webcamAcquiring = false;
-        webcamStream?.getTracks().forEach((t) => t.stop());
-        webcamStream = null;
-        const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLVideoElement;
-        if (videoEl) videoEl.srcObject = null;
+        // Just hide the UI — keep the webcam stream alive so switching back
+        // is instant (no getUserMedia re-acquire, no permission prompts).
+        // The stream is properly released when recording ends (stopEverything).
         const bubble = ui.shadow.querySelector('.flora-webcam') as HTMLElement;
         const controls = ui.shadow.querySelector('.flora-controls') as HTMLElement;
         if (bubble) bubble.style.display = 'none';
@@ -409,9 +407,14 @@ export default defineContentScript({
 
         // Show bubble and acquire webcam if on
         if (msg.webcamOn) {
-          startWebcamPreview();
+          if (webcamStream) {
+            // Already have webcam (switching back to this tab) — just show bubble
+            if (bubble) bubble.style.display = 'block';
+          } else {
+            // New tab or first time — acquire webcam
+            startWebcamPreview();
+          }
         } else {
-          // Webcam off but still show bubble with camera-off indicator
           webcamOn = false;
           if (bubble) bubble.style.display = 'none';
         }

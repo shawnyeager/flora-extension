@@ -201,7 +201,7 @@ async function signEventDirect(
 }
 
 function isRecordingActive(state: ExtensionState): boolean {
-  return ['awaiting_media', 'countdown', 'recording', 'finalizing'].includes(state);
+  return ['awaiting_media', 'countdown', 'recording'].includes(state);
 }
 
 export default defineBackground(() => {
@@ -307,27 +307,38 @@ export default defineBackground(() => {
         }
 
         case MessageType.START_RECORDING: {
-          // Track which tab the user is on — review overlay and NIP-07 happen there
+          setState('initializing');
+
+          // Identify the active tab first, then proceed with offscreen setup.
+          // overlayTabId must be set before setState('awaiting_media') so the
+          // OVERLAY_SHOW message targets the correct tab.
           browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
             recordingTabId = tab?.id ?? null;
             overlayTabId = recordingTabId;
             browser.storage.local.set({ recordingTabId });
-          });
 
-          setState('initializing');
-
-          ensureOffscreenDocument()
-            .then(() => {
+            return ensureOffscreenDocument().then(() => {
               setState('awaiting_media');
+
+              // Send OVERLAY_SHOW only to the recording tab (not broadcast).
+              // This starts the webcam preview on the active tab only.
+              if (overlayTabId) {
+                browser.tabs.sendMessage(overlayTabId, {
+                  type: MessageType.OVERLAY_SHOW,
+                  webcamOn: controlsState.webcamOn,
+                  corner: overlayCorner,
+                }).catch(() => {});
+              }
+
               return browser.runtime.sendMessage({
                 type: MessageType.START_CAPTURE,
                 target: 'offscreen',
               });
-            })
-            .catch((err) => {
-              console.error('[background] failed to start recording:', err);
-              setState('idle');
             });
+          }).catch((err) => {
+            console.error('[background] failed to start recording:', err);
+            setState('idle');
+          });
 
           sendResponse({ ok: true });
           return false;
