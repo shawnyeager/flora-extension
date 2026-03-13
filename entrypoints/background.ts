@@ -415,24 +415,13 @@ export default defineBackground(() => {
         case MessageType.TOGGLE_WEBCAM: {
           controlsState.webcamOn = !!(message as any).enabled;
           const webcamMsg = { type: MessageType.TOGGLE_WEBCAM, enabled: (message as any).enabled };
-          const targetTab = overlayTabId || recordingTabId;
-          if (targetTab) {
-            browser.tabs.sendMessage(targetTab, webcamMsg).catch(() => {
-              // Tab may have navigated — broadcast to all tabs
-              browser.tabs.query({}).then((tabs) => {
-                for (const tab of tabs) {
-                  if (tab.id) browser.tabs.sendMessage(tab.id, webcamMsg).catch(() => {});
-                }
-              });
-            });
-          } else {
-            // No recording tab — broadcast to all tabs
-            browser.tabs.query({}).then((tabs) => {
-              for (const tab of tabs) {
-                if (tab.id) browser.tabs.sendMessage(tab.id, webcamMsg).catch(() => {});
-              }
-            });
-          }
+          // Broadcast to ALL tabs — multiple tabs can have visible bubbles
+          // since we no longer send OVERLAY_HIDE on tab switch.
+          browser.tabs.query({}).then((tabs) => {
+            for (const tab of tabs) {
+              if (tab.id) browser.tabs.sendMessage(tab.id, webcamMsg).catch(() => {});
+            }
+          });
           sendResponse({ ok: true });
           return false;
         }
