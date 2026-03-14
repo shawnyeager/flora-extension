@@ -151,11 +151,12 @@ async function startCapture() {
 
     console.log('[offscreen] recording started');
   } catch (err) {
-    console.error('[offscreen] capture error:', err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('[offscreen] capture error:', errMsg);
     cleanup();
     browser.runtime.sendMessage({
       type: MessageType.CAPTURE_ERROR,
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg,
     });
   }
 }
