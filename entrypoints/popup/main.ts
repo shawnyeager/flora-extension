@@ -229,8 +229,24 @@ camSelector.append(camLabel, camSelect);
 
 async function loadCameraDevices() {
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter((d) => d.kind === 'videoinput');
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    let cameras = devices.filter((d) => d.kind === 'videoinput');
+
+    // Without prior getUserMedia on this origin, the browser reports devices
+    // without labels (and may deduplicate to just one). Request brief camera
+    // access to unlock full enumeration, then immediately release.
+    const needsUnlock = cameras.length <= 1 || cameras.some((c) => !c.label);
+    if (needsUnlock) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach((t) => t.stop());
+        devices = await navigator.mediaDevices.enumerateDevices();
+        cameras = devices.filter((d) => d.kind === 'videoinput');
+      } catch {
+        // User denied camera — show whatever we have
+      }
+    }
+
     const settings = await getSettings();
     const savedId = settings.selectedCameraDeviceId;
 
@@ -246,7 +262,6 @@ async function loadCameraDevices() {
       camSelect.append(opt);
     }
 
-    // If only one camera (or none), hide the selector — no choice to make
     camSelector.style.display = cameras.length > 1 ? 'flex' : 'none';
   } catch {
     camSelector.style.display = 'none';
@@ -358,8 +373,9 @@ function updateUI(state: ExtensionState) {
   destToggle.style.display = isIdle ? '' : 'none';
   destBody.style.display = isIdle ? '' : 'none';
 
-  // Camera selector only visible in idle (and only if multiple cameras exist — loadCameraDevices handles that)
-  camSelector.style.display = isIdle && camSelect.options.length > 2 ? 'flex' : 'none';
+  // Camera selector visibility is managed by loadCameraDevices; just hide when not idle
+  if (!isIdle) camSelector.style.display = 'none';
+  else if (camSelect.options.length > 2) camSelector.style.display = 'flex';
 
   btnRecord.style.display = isIdle ? 'flex' : 'none';
   btnRecord.disabled = false;
