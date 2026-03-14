@@ -264,6 +264,14 @@ body {
   background: var(--fl-bg-subtle);
 }
 
+.url-item-selectable {
+  cursor: pointer;
+}
+
+.url-item-selectable:hover {
+  background: var(--fl-bg-hover);
+}
+
 .url-item-url {
   flex: 1;
   min-width: 0;

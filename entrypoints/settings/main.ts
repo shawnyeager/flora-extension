@@ -62,6 +62,7 @@ function renderList(
   onRemove: (index: number) => void,
   badgeLabel?: string,
   emptyText?: string,
+  onSetPrimary?: (index: number) => void,
 ) {
   list.replaceChildren();
   if (urls.length === 0 && emptyText) {
@@ -86,6 +87,16 @@ function renderList(
       badge.className = 'url-item-badge';
       badge.textContent = badgeLabel;
       li.append(badge);
+    }
+
+    // Non-primary items can be clicked to promote to primary
+    if (i > 0 && onSetPrimary && urls.length > 1) {
+      li.classList.add('url-item-selectable');
+      li.setAttribute('title', 'Click to set as primary');
+      li.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('.url-item-remove')) return;
+        onSetPrimary(i);
+      });
     }
 
     const removeBtn = document.createElement('button');
@@ -113,7 +124,15 @@ function isValidUrl(value: string, protocol: string): boolean {
 // --- Server management ---
 
 function renderServers() {
-  renderList(serverList, servers, removeServer, 'primary', 'No servers added yet');
+  renderList(serverList, servers, removeServer, 'primary', 'No servers added yet', setServerPrimary);
+}
+
+async function setServerPrimary(index: number) {
+  const [server] = servers.splice(index, 1);
+  servers.unshift(server);
+  renderServers();
+  await saveSettings({ blossomServers: servers });
+  showSaved();
 }
 
 async function addServer() {
