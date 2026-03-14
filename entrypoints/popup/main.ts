@@ -1,6 +1,6 @@
 import { MessageType } from '@/utils/messages';
 import { Icons } from '@/utils/icons';
-import { getSettings } from '@/utils/settings';
+import { getSettings, saveSettings } from '@/utils/settings';
 import type { ExtensionState } from '@/utils/state';
 
 const app = document.getElementById('app')!;
@@ -211,14 +211,68 @@ async function syncRecordingState() {
 // --- Buttons ---
 const RECORD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5"/></svg>';
 
+// --- Camera selector ---
+const camSelector = el('div', 'cam-selector');
+const camLabel = el('label', 'cam-label', 'Camera');
+camLabel.setAttribute('for', 'cam-select');
+const camSelect = el('select', 'cam-select') as HTMLSelectElement;
+camSelect.id = 'cam-select';
+camSelect.setAttribute('aria-label', 'Select camera');
+
+// Default option
+const defaultOpt = document.createElement('option');
+defaultOpt.value = '';
+defaultOpt.textContent = 'Default camera';
+camSelect.append(defaultOpt);
+
+camSelector.append(camLabel, camSelect);
+
+async function loadCameraDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((d) => d.kind === 'videoinput');
+    const settings = await getSettings();
+    const savedId = settings.selectedCameraDeviceId;
+
+    // Clear existing options (keep default)
+    while (camSelect.options.length > 1) camSelect.remove(1);
+
+    for (let i = 0; i < cameras.length; i++) {
+      const cam = cameras[i];
+      const opt = document.createElement('option');
+      opt.value = cam.deviceId;
+      opt.textContent = cam.label || `Camera ${i + 1}`;
+      if (cam.deviceId === savedId) opt.selected = true;
+      camSelect.append(opt);
+    }
+
+    // If only one camera (or none), hide the selector — no choice to make
+    camSelector.style.display = cameras.length > 1 ? 'flex' : 'none';
+  } catch {
+    camSelector.style.display = 'none';
+  }
+}
+
+camSelect.addEventListener('change', () => {
+  const deviceId = camSelect.value || null;
+  saveSettings({ selectedCameraDeviceId: deviceId });
+});
+
+// Refresh camera list when devices change
+try {
+  navigator.mediaDevices.addEventListener('devicechange', loadCameraDevices);
+} catch { /* not supported in all contexts */ }
+
+loadCameraDevices();
+
 const btnRecord = el('button', 'btn-record');
-btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
+btnRecord.insertAdjacentHTML('beforeend', `${RECORD_ICON} Start Recording`);
 const btnStop = el('button', 'btn-stop', 'Stop Recording');
 btnStop.style.display = 'none';
 const btnOpen = el('button', 'btn-open', 'Open Review');
 btnOpen.style.display = 'none';
 
-app.append(header, statusBar, destToggle, destBody, recToolbar, btnRecord, btnStop, btnOpen);
+app.append(header, statusBar, destToggle, destBody, camSelector, recToolbar, btnRecord, btnStop, btnOpen);
 
 loadDestination();
 
@@ -303,6 +357,9 @@ function updateUI(state: ExtensionState) {
 
   destToggle.style.display = isIdle ? '' : 'none';
   destBody.style.display = isIdle ? '' : 'none';
+
+  // Camera selector only visible in idle (and only if multiple cameras exist — loadCameraDevices handles that)
+  camSelector.style.display = isIdle && camSelect.options.length > 2 ? 'flex' : 'none';
 
   btnRecord.style.display = isIdle ? 'flex' : 'none';
   btnRecord.disabled = false;

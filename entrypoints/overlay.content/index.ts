@@ -380,9 +380,22 @@ export default defineContentScript({
       webcamAborted = false;
       webcamAcquiring = true;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        });
+        // Read selected camera from settings
+        let videoConstraints: MediaTrackConstraints = {
+          width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user',
+        };
+        try {
+          const { settings } = await browser.storage.local.get('settings');
+          const deviceId = settings?.selectedCameraDeviceId;
+          if (deviceId) {
+            videoConstraints = {
+              width: { ideal: 640 }, height: { ideal: 480 },
+              deviceId: { exact: deviceId },
+            };
+          }
+        } catch { /* use defaults */ }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
         webcamAcquiring = false;
         if (webcamAborted) { stream.getTracks().forEach((t) => t.stop()); return; }
         webcamStream = stream;
@@ -390,6 +403,19 @@ export default defineContentScript({
         videoEl.style.display = 'block';
         offEl.style.display = 'none';
         webcamOn = true;
+
+        // Handle device disconnection mid-recording
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.addEventListener('ended', () => {
+            webcamStream = null;
+            videoEl.style.display = 'none';
+            offEl.style.display = 'flex';
+            webcamOn = false;
+            bubble.style.display = 'none';
+            browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false }).catch(() => {});
+          });
+        }
 
         bubble.style.display = 'block';
       } catch {

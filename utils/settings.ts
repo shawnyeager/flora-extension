@@ -3,6 +3,7 @@ export interface FloraSettings {
   nostrRelays: string[];
   publishToNostr: boolean;
   nostrPubkey: string; // hex pubkey, entered as npub in settings UI
+  selectedCameraDeviceId: string | null; // deviceId from enumerateDevices, null = default
 }
 
 const DEFAULTS: FloraSettings = {
@@ -10,6 +11,7 @@ const DEFAULTS: FloraSettings = {
   nostrRelays: ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.nostr.band'],
   publishToNostr: false,
   nostrPubkey: '',
+  selectedCameraDeviceId: null,
 };
 
 export async function getSettings(): Promise<FloraSettings> {
