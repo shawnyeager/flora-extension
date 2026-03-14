@@ -175,17 +175,19 @@ export default defineContentScript({
         camToggle.addEventListener('click', (e) => {
           e.stopPropagation();
           webcamOn = !webcamOn;
+          const camBtn = ui.shadow.querySelector('.flora-btn-cam') as HTMLElement;
           if (!webcamOn) {
+            webcamAborted = true;
+            webcamAcquiring = false;
+            releaseWebcam();
             webcamBubble.style.display = 'none';
-            const camBtn = ui.shadow.querySelector('.flora-btn-cam') as HTMLElement;
-            if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
+            if (camBtn) { camBtn.textContent = ''; camBtn.insertAdjacentHTML('beforeend', Icons.cameraOff); camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
-            webcamVideoEl.style.display = 'block';
-            webcamOff.style.display = 'none';
+            // Re-acquire webcam with selected device
             webcamBubble.style.display = 'block';
-            const camBtn = ui.shadow.querySelector('.flora-btn-cam') as HTMLElement;
-            if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
+            startWebcamPreview();
+            if (camBtn) { camBtn.textContent = ''; camBtn.insertAdjacentHTML('beforeend', Icons.camera); camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
           }
         });
@@ -301,16 +303,20 @@ export default defineContentScript({
         camBtn.addEventListener('click', () => {
           webcamOn = !webcamOn;
           if (!webcamOn) {
+            webcamAborted = true;
+            webcamAcquiring = false;
+            releaseWebcam();
             webcamBubble.style.display = 'none';
-            camBtn.innerHTML = Icons.cameraOff;
+            camBtn.textContent = '';
+            camBtn.insertAdjacentHTML('beforeend', Icons.cameraOff);
             camBtn.classList.add('active');
             camBtn.setAttribute('aria-label', 'Turn camera on');
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false });
           } else {
-            webcamVideoEl.style.display = 'block';
-            webcamOff.style.display = 'none';
             webcamBubble.style.display = 'block';
-            camBtn.innerHTML = Icons.camera;
+            startWebcamPreview();
+            camBtn.textContent = '';
+            camBtn.insertAdjacentHTML('beforeend', Icons.camera);
             camBtn.classList.remove('active');
             camBtn.setAttribute('aria-label', 'Turn camera off');
             browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: true });
@@ -368,6 +374,14 @@ export default defineContentScript({
 
     function stopTimer() {
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    /** Release webcam tracks (turns off hardware indicator) */
+    function releaseWebcam() {
+      webcamStream?.getTracks().forEach((t) => t.stop());
+      webcamStream = null;
+      const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLVideoElement;
+      if (videoEl) videoEl.srcObject = null;
     }
 
     async function startWebcamPreview() {
@@ -433,10 +447,7 @@ export default defineContentScript({
     function stopEverything() {
       webcamAborted = true;
       webcamAcquiring = false;
-      webcamStream?.getTracks().forEach((t) => t.stop());
-      webcamStream = null;
-      const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLVideoElement;
-      if (videoEl) videoEl.srcObject = null;
+      releaseWebcam();
       const controls = ui.shadow.querySelector('.flora-controls') as HTMLElement;
       const bubble = ui.shadow.querySelector('.flora-webcam') as HTMLElement;
       if (controls) controls.style.display = 'none';
@@ -503,15 +514,15 @@ export default defineContentScript({
           const bubble = ui.shadow.querySelector('.flora-webcam') as HTMLElement;
           const camBtn = ui.shadow.querySelector('.flora-btn-cam') as HTMLElement;
           if (!webcamOn) {
+            webcamAborted = true;
+            webcamAcquiring = false;
+            releaseWebcam();
             if (bubble) bubble.style.display = 'none';
-            if (camBtn) { camBtn.innerHTML = Icons.cameraOff; camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
+            if (camBtn) { camBtn.textContent = ''; camBtn.insertAdjacentHTML('beforeend', Icons.cameraOff); camBtn.classList.add('active'); camBtn.setAttribute('aria-label', 'Turn camera on'); }
           } else {
-            const videoEl = ui.shadow.querySelector('.flora-webcam video') as HTMLElement;
-            const offEl = ui.shadow.querySelector('.flora-webcam-off') as HTMLElement;
-            if (videoEl) videoEl.style.display = 'block';
-            if (offEl) offEl.style.display = 'none';
             if (bubble) bubble.style.display = 'block';
-            if (camBtn) { camBtn.innerHTML = Icons.camera; camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
+            startWebcamPreview();
+            if (camBtn) { camBtn.textContent = ''; camBtn.insertAdjacentHTML('beforeend', Icons.camera); camBtn.classList.remove('active'); camBtn.setAttribute('aria-label', 'Turn camera off'); }
           }
         }
         return false;
