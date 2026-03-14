@@ -74,10 +74,10 @@ h1 {
 /* --- Video --- */
 
 video {
+  display: block;
   width: 100%;
   border-radius: var(--fl-radius-lg);
-  background: #09090b;
-  aspect-ratio: auto;
+  background: transparent;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   margin-bottom: 10px;
 }
