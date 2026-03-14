@@ -72,7 +72,7 @@ Open the settings page from the popup menu to configure:
 
 ### NIP-07 Signing
 
-Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as an npub in Settings.
+Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as a npub in Settings.
 
 ## Development
 
