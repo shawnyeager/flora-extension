@@ -126,10 +126,17 @@ async function loadVideo() {
 
     if (record?.data) {
       videoBlobUrl = URL.createObjectURL(new Blob([record.data], { type: 'video/mp4' }));
-      // Wait for metadata so the video element has intrinsic dimensions before we show the view
+      // Hide video until first frame is decoded to prevent black flash / pop
+      previewVideo.style.visibility = 'hidden';
       await new Promise<void>((resolve) => {
-        previewVideo.onloadedmetadata = () => resolve();
-        previewVideo.onerror = () => resolve();
+        previewVideo.onloadeddata = () => {
+          previewVideo.style.visibility = 'visible';
+          resolve();
+        };
+        previewVideo.onerror = () => {
+          previewVideo.style.visibility = 'visible';
+          resolve();
+        };
         previewVideo.src = videoBlobUrl!;
       });
       confirmVideo.src = videoBlobUrl;
