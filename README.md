@@ -67,12 +67,12 @@ Then load `.output/chrome-mv3/` as an unpacked extension (same steps 3-6 above).
 Open the settings page from the popup menu to configure:
 
 - **Blossom servers** — where recordings are uploaded (defaults: `blossom.primal.net`, `blossom.nostr.build`)
-- **Nostr relays** — where notes are published (defaults: `nos.lol`, `relay.damus.io`, `relay.primal.net`, `relay.nostr.band`)
+- **Nostr relays** — where notes are published (defaults: `nos.lol`, `relay.damus.io`, `relay.primal.net`)
 - **Publish to Nostr** — toggle automatic note publishing after upload
 
 ### NIP-07 Signing
 
-Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as an npub in Settings.
+Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as a npub in Settings.
 
 ## Development
 
