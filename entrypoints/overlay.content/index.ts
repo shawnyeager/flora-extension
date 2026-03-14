@@ -399,6 +399,8 @@ export default defineContentScript({
         offEl.style.display = 'flex';
         webcamOn = false;
         bubble.style.display = 'none';
+        // Sync failure state back to background so popup reflects reality
+        browser.runtime.sendMessage({ type: MessageType.TOGGLE_WEBCAM, enabled: false }).catch(() => {});
       }
     }
 

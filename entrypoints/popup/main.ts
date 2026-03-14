@@ -228,17 +228,20 @@ btnRecord.addEventListener('click', async () => {
   btnRecord.innerHTML = `${RECORD_ICON} Starting\u2026`;
 
   try {
-    const camStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    // Only check mic permission — the offscreen document needs it and shares the
+    // extension origin. Camera permission is handled by the content script in the
+    // web page's origin, so checking it here would be misleading.
     const micStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
 
-    if (camStatus.state === 'granted' && micStatus.state === 'granted') {
+    if (micStatus.state === 'granted') {
       await browser.runtime.sendMessage({ type: MessageType.START_RECORDING });
     } else {
       await browser.tabs.create({ url: browser.runtime.getURL('/permissions.html') });
     }
   } catch {
     btnRecord.disabled = false;
-    btnRecord.innerHTML = `${RECORD_ICON} Start Recording`;
+    btnRecord.textContent = '';
+    btnRecord.insertAdjacentHTML('beforeend', `${RECORD_ICON} Start Recording`);
   }
 });
 

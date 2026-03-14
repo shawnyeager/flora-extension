@@ -5,14 +5,17 @@ const sub = document.getElementById('sub')!;
 
 async function requestPermissions() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    // Request audio only — the mic is used by the offscreen document which shares
+    // the extension origin. Camera permission is requested by the content script
+    // in the web page's origin, so granting it here wouldn't help.
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach((t) => t.stop());
-    status.textContent = 'Permissions granted!';
+    status.textContent = 'Microphone access granted!';
     sub.textContent = 'Starting recording...';
   } catch (err) {
     console.warn('[permissions] denied:', err);
-    status.textContent = 'Permissions denied';
-    sub.textContent = 'Recording will continue without camera/microphone.';
+    status.textContent = 'Microphone access denied';
+    sub.textContent = 'Recording will continue without microphone.';
   }
 
   // Tell background to proceed with recording
