@@ -88,17 +88,27 @@ function setState(state: ExtensionState) {
     state,
   }).catch(() => {});
 
-  // Send to content scripts in all tabs
-  browser.tabs.query({}).then((tabs) => {
-    for (const tab of tabs) {
-      if (tab.id) {
-        browser.tabs.sendMessage(tab.id, {
-          type: MessageType.STATE_CHANGED,
-          state,
-        }).catch(() => {});
+  // Send to content scripts — scope webcam-triggering states to recording tab only
+  const webcamStates: ExtensionState[] = ['awaiting_media', 'recording'];
+  if (webcamStates.includes(state) && recordingTabId) {
+    // Only the recording tab needs to start webcam preview
+    browser.tabs.sendMessage(recordingTabId, {
+      type: MessageType.STATE_CHANGED,
+      state,
+    }).catch(() => {});
+  } else {
+    // Cleanup states (idle, finalizing, etc.) broadcast to all tabs
+    browser.tabs.query({}).then((tabs) => {
+      for (const tab of tabs) {
+        if (tab.id) {
+          browser.tabs.sendMessage(tab.id, {
+            type: MessageType.STATE_CHANGED,
+            state,
+          }).catch(() => {});
+        }
       }
-    }
-  });
+    });
+  }
 
   // REC badge on extension icon
   if (state === 'recording') {
@@ -295,11 +305,38 @@ export default defineBackground(() => {
         }
 
         case MessageType.START_RECORDING: {
-          // Track which tab the user is on — review overlay and NIP-07 happen there
-          browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-            recordingTabId = tab?.id ?? null;
+          // Track which tab the user is on — review overlay and NIP-07 happen there.
+          // Use sender's tab if available (popup sends from extension context, so
+          // fall back to active tab query for that case).
+          if (_sender.tab?.id) {
+            recordingTabId = _sender.tab.id;
             browser.storage.local.set({ recordingTabId });
-          });
+          } else {
+            // Popup doesn't have a tab — query for active tab synchronously-ish
+            // but set recordingTabId BEFORE setState to avoid the race
+            const tabPromise = browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              recordingTabId = tab?.id ?? null;
+              browser.storage.local.set({ recordingTabId });
+            });
+            // Wait for tab ID before transitioning state
+            tabPromise.then(() => {
+              setState('initializing');
+              ensureOffscreenDocument()
+                .then(() => {
+                  setState('awaiting_media');
+                  return browser.runtime.sendMessage({
+                    type: MessageType.START_CAPTURE,
+                    target: 'offscreen',
+                  });
+                })
+                .catch((err) => {
+                  console.error('[background] failed to start recording:', err);
+                  setState('idle');
+                });
+            });
+            sendResponse({ ok: true });
+            return false;
+          }
 
           setState('initializing');
 

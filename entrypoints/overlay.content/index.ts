@@ -27,6 +27,10 @@ export default defineContentScript({
     // Webcam
     let webcamOn = true;
 
+    // Flag set when we receive a direct STATE_CHANGED message (not via storage),
+    // indicating this content script is on the recording tab
+    let isRecordingTabFlag = false;
+
     // Bubble size & position
     type BubbleSize = 'sm' | 'md' | 'lg';
     let bubbleSize: BubbleSize = 'md';
@@ -436,11 +440,30 @@ export default defineContentScript({
       }
     }
 
+    /** Like updateUI but skips webcam acquisition — used when we can't confirm
+     *  this is the recording tab (e.g., restoring from storage on init). */
+    function updateUIWithoutWebcam(state: ExtensionState) {
+      currentOverlayState = state;
+      if (state === 'recording') {
+        const controls = ui.shadow.querySelector('.flora-controls') as HTMLElement;
+        if (controls) controls.style.display = 'none';
+        startTimer();
+      } else if (state !== 'awaiting_media') {
+        stopEverything();
+      }
+    }
+
     // ==========================================
     // Message Listeners
     // ==========================================
     browser.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
       if (message.type === MessageType.STATE_CHANGED && message.state) {
+        // If we receive a direct STATE_CHANGED message for a webcam state,
+        // it means the background specifically targeted us — we're the recording tab
+        const webcamStates: ExtensionState[] = ['awaiting_media', 'recording'];
+        if (webcamStates.includes(message.state)) {
+          isRecordingTabFlag = true;
+        }
         updateUI(message.state as ExtensionState);
         return false;
       }
@@ -469,17 +492,33 @@ export default defineContentScript({
       return false;
     });
 
-    // Backup: storage listener for state changes
+    // Backup: storage listener for state changes (cleanup states only — webcam states
+    // are sent directly to the recording tab via message, not storage)
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'local' && changes.state) {
-        updateUI(changes.state.newValue as ExtensionState);
+        const newState = changes.state.newValue as ExtensionState;
+        // Only act on non-webcam states from storage (webcam states come via direct message)
+        const webcamStates: ExtensionState[] = ['awaiting_media', 'recording'];
+        if (!webcamStates.includes(newState)) {
+          updateUI(newState);
+        }
       }
     });
 
-    // Init: restore state
+    // Init: restore state (only start webcam if we're the recording tab)
     try {
-      const result = await browser.storage.local.get('state');
-      if (result.state) updateUI(result.state as ExtensionState);
+      const result = await browser.storage.local.get(['state', 'recordingTabId']);
+      if (result.state) {
+        const state = result.state as ExtensionState;
+        const webcamStates: ExtensionState[] = ['awaiting_media', 'recording'];
+        if (webcamStates.includes(state)) {
+          // We can't know our tab ID from the content script, so skip webcam
+          // on init — the background will send us a direct message if we're the recording tab
+          updateUIWithoutWebcam(state);
+        } else {
+          updateUI(state);
+        }
+      }
     } catch { /* extension context may not be available */ }
   },
 });
