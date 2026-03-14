@@ -305,20 +305,24 @@ export default defineBackground(() => {
         }
 
         case MessageType.START_RECORDING: {
-          // Track which tab the user is on — review overlay and NIP-07 happen there.
-          // Use sender's tab if available (popup sends from extension context, so
-          // fall back to active tab query for that case).
-          if (_sender.tab?.id) {
-            recordingTabId = _sender.tab.id;
-            browser.storage.local.set({ recordingTabId });
-          } else {
-            // Popup doesn't have a tab — query for active tab synchronously-ish
-            // but set recordingTabId BEFORE setState to avoid the race
-            const tabPromise = browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-              recordingTabId = tab?.id ?? null;
+          // Track which web tab the user is on — webcam overlay and NIP-07 happen there.
+          // Always query for an active http/https tab. Don't use _sender.tab.id because
+          // START_RECORDING can come from permissions.html (an extension page) which
+          // doesn't run content scripts.
+          {
+            const tabPromise = browser.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+              if (tab?.id && tab.url && /^https?:/.test(tab.url)) {
+                recordingTabId = tab.id;
+              } else {
+                // Active tab isn't a web page (e.g., permissions.html) — find one
+                const webTabs = await browser.tabs.query({ active: true });
+                const webTab = webTabs.find((t) => t.id && t.url && /^https?:/.test(t.url));
+                recordingTabId = webTab?.id ?? null;
+              }
               browser.storage.local.set({ recordingTabId });
             });
-            // Wait for tab ID before transitioning state
+
+            // Wait for tab ID before transitioning state to avoid race
             tabPromise.then(() => {
               setState('initializing');
               ensureOffscreenDocument()
@@ -337,24 +341,6 @@ export default defineBackground(() => {
             sendResponse({ ok: true });
             return false;
           }
-
-          setState('initializing');
-
-          ensureOffscreenDocument()
-            .then(() => {
-              setState('awaiting_media');
-              return browser.runtime.sendMessage({
-                type: MessageType.START_CAPTURE,
-                target: 'offscreen',
-              });
-            })
-            .catch((err) => {
-              console.error('[background] failed to start recording:', err);
-              setState('idle');
-            });
-
-          sendResponse({ ok: true });
-          return false;
         }
 
         case MessageType.STOP_RECORDING: {
