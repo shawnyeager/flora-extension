@@ -229,6 +229,51 @@ async function signEventDirect(
   }
 }
 
+async function nip44EncryptDirect(
+  tabId: number,
+  recipientPubkey: string,
+  plaintext: string,
+): Promise<{ ok: true; data: string } | { ok: false; error: string }> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      args: [recipientPubkey, plaintext],
+      func: (pubkey: string, text: string) => {
+        const nostr = (window as any).nostr;
+        if (!nostr) return { ok: false, error: 'No NIP-07 signer found' };
+        if (!nostr.nip44?.encrypt) return { ok: false, error: 'Signer does not support NIP-44 encryption' };
+        return Promise.race([
+          nostr.nip44.encrypt(pubkey, text).then(
+            (ct: string) => ct ? { ok: true, data: ct } : { ok: false, error: 'nip44.encrypt returned empty' },
+            (err: any) => ({ ok: false, error: String(err) }),
+          ),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: 'NIP-44 encrypt timed out (10s)' }), 10000)),
+        ]);
+      },
+    });
+    return results?.[0]?.result || { ok: false, error: 'no result' };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function probeNip44Support(tabId: number): Promise<boolean> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const nostr = (window as any).nostr;
+        return !!(nostr?.nip44?.encrypt && nostr?.nip44?.decrypt);
+      },
+    });
+    return results?.[0]?.result === true;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchContacts(pubkey: string, relays: string[]): Promise<Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }>> {
   const pool = new SimplePool();
   try {
@@ -675,6 +720,32 @@ export default defineBackground(() => {
           return true;
         }
 
+        case MessageType.NIP44_ENCRYPT: {
+          const msg = message as any;
+          findScriptableTab()
+            .then(async (tabId) => {
+              if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-44' });
+
+              // Remember which tab the user is on so we can switch back
+              const [callerTab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+              const callerTabId = callerTab?.id;
+
+              // Focus the signing tab so the user can see the signer popup
+              await browser.tabs.update(tabId, { active: true });
+
+              const result = await nip44EncryptDirect(tabId, msg.recipientPubkey, msg.plaintext);
+
+              // Switch back to the caller tab
+              if (callerTabId) {
+                browser.tabs.update(callerTabId, { active: true }).catch(() => {});
+              }
+
+              sendResponse(result);
+            })
+            .catch((err) => sendResponse({ ok: false, error: err.message }));
+          return true;
+        }
+
         case MessageType.GET_CONFIRM_DATA: {
           // Light probe only — never call getPublicKey() here. It opens a signer
           // popup on the recording tab that the user can't see or interact with
@@ -682,9 +753,12 @@ export default defineBackground(() => {
           // populated after the first successful signEvent.
           Promise.all([
             getSettings(),
-            findScriptableTab().then((tabId) =>
-              tabId ? probeNip07Exists(tabId) : { error: 'No web tab available' },
-            ).catch((err: any) => ({ error: err.message })),
+            findScriptableTab().then(async (tabId) => {
+              if (!tabId) return { error: 'No web tab available', nip44: false };
+              const probe = await probeNip07Exists(tabId);
+              const nip44 = 'available' in probe ? await probeNip44Support(tabId) : false;
+              return { ...probe, nip44 };
+            }).catch((err: any) => ({ error: err.message, nip44: false })),
           ])
             .then(([settings, signerResult]) => {
               const signerAvailable = 'available' in signerResult;
@@ -694,11 +768,13 @@ export default defineBackground(() => {
                 server: settings.blossomServers[0] || 'https://blossom.band',
                 relays: settings.nostrRelays,
                 publishToNostr: settings.publishToNostr,
+                defaultSharingMode: settings.defaultSharingMode,
                 fileSize: lastRecordingMeta?.size ?? 0,
                 duration: lastRecordingMeta?.duration ?? 0,
                 npub,
                 signerAvailable,
                 bridgeError: signerAvailable ? null : bridgeError,
+                nip44Supported: (signerResult as any).nip44 === true,
               });
             })
             .catch((err) => {
