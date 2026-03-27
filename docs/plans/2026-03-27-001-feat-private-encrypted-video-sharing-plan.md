@@ -3,8 +3,22 @@ title: "feat: Add private encrypted video sharing via NIP-17 Kind 15"
 type: feat
 status: active
 date: 2026-03-27
+deepened: 2026-03-27
 origin: docs/plans/2026-03-27-feat-private-sharing-design.md
 ---
+
+## Enhancement Summary
+
+**Deepened on:** 2026-03-27
+**Research agents used:** security-sentinel, architecture-strategist, performance-oracle, kieran-typescript-reviewer, julik-frontend-races-reviewer, Web Crypto AES-GCM research, Context7 (nostr-tools, NIP specs)
+
+### Key Improvements from Deepening
+1. **Security:** Zero-fill all key material (`key`, `nonce`, `ephemeralSk`) after use; import raw key into non-extractable `CryptoKey` before zeroing source bytes
+2. **Performance:** Fix IDB `getAll()` → cursor (existing bug), null buffers after encryption to halve peak memory, parallelize Kind 0 batch fetches, separate gift-wrap construction from relay publishing
+3. **Architecture:** Update TRANSITIONS table, add tab-focus to NIP44_ENCRYPT handler, use `try/finally` on all SimplePool usage
+4. **Race conditions:** Replace blur `setTimeout` with `mousedown preventDefault` on dropdown, optimistic chip insertion with async DM relay fetch, guard async operations against mode switches
+5. **TypeScript:** Fix `nip44` import path, verify `getEventHash` export, use discriminated union narrowing instead of `as any`, type `giftWrapKind15` return as `NostrEvent`
+6. **Crypto:** Hex encoding confirmed for key/nonce (0xchat/Amethyst interop), 12-byte random nonce safe for single-use keys, NIP-44 payload size guard
 
 # Private Encrypted Video Sharing
 
@@ -56,15 +70,53 @@ Always use nostr-tools submodule imports per existing codebase patterns:
 import { generateSecretKey, getPublicKey, finalizeEvent, getEventHash } from 'nostr-tools/pure';
 import { v2 as nip44 } from 'nostr-tools/nip44';
 import { decode } from 'nostr-tools/nip19';
+import { queryProfile } from 'nostr-tools/nip05'; // static import, not dynamic
+import type { UnsignedEvent, NostrEvent } from 'nostr-tools/pure';
 ```
+
+**Verify at build time:** `getEventHash` may not be exported from `nostr-tools/pure`. If not, compute manually with `import { sha256 } from '@noble/hashes/sha256'` and serialize per NIP-01.
+
+**Never use barrel import** (`import { nip44 } from 'nostr-tools'`) — pulls entire package, wrong for extensions.
 
 ### IDB Considerations
 
 No schema version bump needed — we're adding optional fields to existing records (`sharingMode`, `encryptedBlobHash`, `recipients`), not new object stores or indexes. The `openDB()` function is duplicated in `offscreen/main.ts` and `review/main.ts`.
 
+**Existing bug:** Both `uploadRecording()` and the new `sendPrivate()` use `store.getAll()` to find the latest recording — this loads ALL recording blobs into memory. Fix: use `by_timestamp` index with a reverse cursor (`index.openCursor(null, 'prev')`) to load only the latest. Fix in both existing and new code.
+
 ### Memory
 
-AES-GCM encryption holds original + encrypted buffers in memory simultaneously. For very large recordings this could be an issue, but acceptable for v1.
+AES-GCM encryption holds original + encrypted buffers in memory simultaneously. Peak memory is ~3x video size (IDB record + original ref + encrypted output). Crashes expected at ~250-300MB recordings (a few minutes of 1080p).
+
+**Mitigation (must implement):** Null `recording.data` immediately after extracting the buffer. Release `originalBuffer` reference after encryption completes (let it go out of scope before upload begins). This reduces peak to ~2x.
+
+### Key Material Handling
+
+**Best-effort zeroing pattern:**
+```typescript
+const rawKey = crypto.getRandomValues(new Uint8Array(32));
+const cryptoKey = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
+rawKey.fill(0); // zero source immediately after import
+
+// ... use cryptoKey for encryption ...
+// After encryption: let cryptoKey go out of scope
+
+// After gift-wrap loop: zero the hex-encoded copies too
+key.fill(0);
+nonce.fill(0);
+```
+
+Also zero `ephemeralSk.fill(0)` after each `finalizeEvent` call in `giftWrapKind15`.
+
+JS cannot guarantee memory wiping (GC copies, JIT optimizations), but `.fill(0)` is standard practice and signals intent.
+
+### Crypto Format (Confirmed via 0xchat/Amethyst interop)
+
+- **Key format:** Hex-encoded (64 chars for 32 bytes) in `decryption-key` tag
+- **Nonce format:** Hex-encoded (24 chars for 12 bytes) in `decryption-nonce` tag
+- **Nonce size:** 12 bytes (96 bits) — NIST-recommended for AES-GCM
+- **Collision risk:** Zero — each key is used exactly once (one encrypt per key)
+- **Algorithm tag value:** `aes-gcm` (only supported value per NIP-17)
 
 ## System-Wide Impact
 
@@ -90,6 +142,16 @@ Review Page                    Background                     Offscreen
 ### State Transitions
 
 No new states needed. Private shares reuse `uploading -> complete` (skipping `publishing`). Progress text updated dynamically via `UPLOAD_PROGRESS` `serverName` field.
+
+**Must update `utils/state.ts` TRANSITIONS table:** Add `'complete'` to the `uploading` transitions:
+```typescript
+uploading: ['publishing', 'complete', 'error'],  // 'complete' for unlisted/private paths
+```
+Update the JSDoc comment to document the unlisted/private path. `canTransition()` is exported and could be used by future code.
+
+### NIP44_ENCRYPT Tab Focus
+
+The `NIP44_ENCRYPT` handler must mirror the tab-switching dance from `NIP07_SIGN` — focus the signing tab before calling `nip44EncryptDirect`, then switch back. Without this, signer prompts are invisible and will timeout (10s per recipient = flow appears hung).
 
 ### Error Propagation
 
@@ -145,40 +207,70 @@ Summary of 10 tasks:
 9. **Recordings library** — Private badge with correct class names (`rec-badge rec-badge-private`)
 10. **Build & smoke test** — TypeScript check, build, manual test checklist
 
-### Critical Fixes from Spec-Flow Analysis
+### Critical Fixes (Consolidated from All Reviews)
 
-These must be incorporated during implementation (not in the original plan):
+These MUST be incorporated during implementation. The detailed implementation plan code does NOT include these — they must be applied as corrections.
 
-**Code-level bugs:**
-- Badge classes must be `rec-badge rec-badge-private` (not `badge badge-private`) — matches existing `rec-badge-posted`/`rec-badge-uploaded`
-- Variable is `thumb` (not `thumbnailWrap`) in recordings/main.ts
-- Remove `confirmPublish` element ref and all usages (element removed from HTML)
-- Update `ConfirmData` interface to include `defaultSharingMode`, `nip44Supported`
+**Security (from security-sentinel):**
+- Zero-fill `key.fill(0)` and `nonce.fill(0)` after the gift-wrap loop in `sendPrivate`
+- Zero-fill `ephemeralSk.fill(0)` before returning from `giftWrapKind15`
+- Import raw AES key into non-extractable `CryptoKey` via `importKey(..., false, ['encrypt'])`, then zero source `Uint8Array` immediately
+- Validate avatar URLs: only allow `https?://` scheme before setting `img.src`
+- Add NIP-44 payload size guard: `if (rumorJson.length > 64000) throw`
+- Use `crypto.getRandomValues` for timestamp randomization instead of `Math.random()`
 
-**Error handling:**
-- Check `sent === 0` after gift-wrap loop — send `PRIVATE_SEND_ERROR` if all deliveries failed
-- Track which recipients were successfully delivered, show accurate names on complete screen
-- Show inline error for failed NIP-05 resolution ("Could not resolve") and invalid npub ("Invalid npub")
-
-**State management:**
+**Architecture (from architecture-strategist):**
+- Update `utils/state.ts` TRANSITIONS: `uploading: ['publishing', 'complete', 'error']`
+- Add tab-focus logic to `NIP44_ENCRYPT` handler (mirror `NIP07_SIGN` pattern)
 - Reset `pendingSharingMode` and `pendingRecipients` in `RESET_STATE` handler
+- Include sender as gift-wrap recipient (NIP-17 convention for conversation history)
+- Wrap ALL `SimplePool` usage in `try/finally` to prevent connection leaks
+
+**Performance (from performance-oracle):**
+- Fix IDB `getAll()` → use `by_timestamp` index cursor in both existing `uploadRecording` and new `sendPrivate`
+- Null `recording.data` after extracting buffer; release `originalBuffer` after encryption
+- Parallelize Kind 0 profile batch fetches with `Promise.allSettled`
+- Separate gift-wrap construction (sequential, signer constraint) from relay publishing (parallel)
+- Share a single `SimplePool` instance in background with idle timeout cleanup
+- Use `Set` for O(n) contact dedup instead of O(n^2) `Array.some`
+
+**Race Conditions (from julik-frontend-races-reviewer):**
+- Replace blur `setTimeout(200)` with `mousedown` + `preventDefault` on dropdown container
+- Optimistic chip insertion: add chip immediately, fetch DM relays in background, re-render on resolve
+- Add `contactsLoading` guard to prevent concurrent fetches; show "Loading contacts..." placeholder
+- Guard `handleDirectInput` and `selectRecipient` against mode switches during async resolution
+- Add `img.onerror` fallback on avatar images to show placeholder
+
+**TypeScript (from kieran-typescript-reviewer):**
+- Fix nip44 import: `import { v2 as nip44 } from 'nostr-tools/nip44'` (not barrel import)
+- Verify `getEventHash` exists in `nostr-tools/pure` — if not, compute manually
+- Type `giftWrapKind15` return as `Promise<NostrEvent>` (not `Promise<any>`)
+- Use discriminated union narrowing on message handlers instead of `as any`
+- Use static imports for `nostr-tools/nip05` and `nostr-tools/nip19` (not dynamic `import()`)
+- Remove dead `confirmPublish` element ref and all usages
+- Extract "get latest recording from IDB" into shared helper (used 3+ times)
+
+**Code-level bugs (from spec-flow-analyzer):**
+- Badge classes must be `rec-badge rec-badge-private` (not `badge badge-private`)
+- Variable is `thumb` (not `thumbnailWrap`) in recordings/main.ts
+- Update `ConfirmData` interface to include `defaultSharingMode`, `nip44Supported`
 - Add `defaultSharingMode` migration in `getSettings()`: if undefined, derive from `publishToNostr`
 - Derive `publishToNostr` from `sharingMode` only — remove dual source of truth
-
-**NIP-17 compliance:**
-- Include sender as a gift-wrap recipient (send copy to self for conversation history)
-
-**UX polish:**
+- Check `sent === 0` after gift-wrap loop — throw error if all deliveries failed
+- Track which recipients were successfully delivered, show accurate names on complete screen
+- Show inline error for failed NIP-05 resolution and invalid npub
 - Handle Escape key to dismiss dropdown
 - Filter already-selected recipients from recent suggestions
-- Contact caching in chrome.storage.local with 1-hour TTL (design doc requirement)
+- Implement contact caching in chrome.storage.local with 1-hour TTL
 
 ## Dependencies & Risks
 
 - **NIP-44 signer support** — Private mode requires `window.nostr.nip44.encrypt`. nos2x confirmed. Alby likely but unconfirmed. Graceful degradation: disable Private button.
 - **Blossom content-type** — Encrypted blob uploaded as `application/octet-stream`. Some servers may reject non-media types. Mitigation: let it fail with clear error.
-- **Large recordings** — 500MB+ videos require ~1GB RAM during encryption (original + encrypted copy). Acceptable for v1.
-- **NIP-07 signer prompts** — Each recipient requires a `nip44.encrypt` call which may prompt the user. 10 recipients = potentially 10 signer prompts.
+- **Large recordings** — Crashes expected at ~250-300MB (3x memory spike). With buffer nulling mitigation, safe to ~400-500MB. Streaming encryption not available for AES-GCM in browsers (Web Crypto streams proposal explicitly excludes authenticated ciphers).
+- **NIP-07 signer prompts** — Each recipient requires a sequential `nip44.encrypt` call through the signer. Some signers (nos2x) batch-approve after first prompt; others may prompt for each. With 10+ recipients, flow takes 2-5s best case. Consider adding recipient cap (15-20) and pre-warning in UI.
+- **MAIN world plaintext exposure** — The AES decryption key (inside the serialized rumor) briefly exists in the web page's MAIN world during `scripting.executeScript` for NIP-44 encryption. This is inherent to NIP-07 architecture (same exposure as existing `signEvent`). Accepted risk — prefer recording tab for signing (already the case via `findScriptableTab`).
+- **Single key per encrypted blob** — All recipients share the same AES key. If any recipient is compromised, all copies are compromised. This is inherent to the architecture and matches 0xchat/Amethyst behavior. Document as accepted design decision.
 
 ## Sources & References
 
