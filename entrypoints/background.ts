@@ -13,6 +13,8 @@ let lastError: string | null = null;
 let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let pendingNoteContent: string | undefined;
+let pendingSharingMode: SharingMode = 'public';
+let pendingRecipients: Array<{ pubkey: string; name?: string; relays?: string[] }> = [];
 let recordingTabId: number | null = null;
 
 // Recording controls state (shared between popup and content script)
@@ -371,13 +373,15 @@ export default defineBackground(() => {
           uploadResult = null;
           publishResult = null;
           lastError = null;
+          pendingSharingMode = 'public';
+          pendingRecipients = [];
           closeOffscreenDocument().catch(console.error);
           sendResponse({ ok: true });
           return false;
         }
 
         case MessageType.GET_RESULT:
-          sendResponse({ uploadResult, publishResult });
+          sendResponse({ uploadResult, publishResult, sharingMode: pendingSharingMode, recipients: pendingRecipients });
           return false;
 
         case MessageType.GET_ERROR:
@@ -668,6 +672,28 @@ export default defineBackground(() => {
           return false;
         }
 
+        case MessageType.PRIVATE_SEND_COMPLETE: {
+          const msg = message as any;
+          console.log(`[background] private send complete: ${msg.recipientCount} recipients`);
+          uploadResult = { url: '', sha256: msg.encryptedBlobHash, size: 0 };
+          publishResult = null;
+          // Store delivered pubkeys for the complete screen
+          pendingRecipients = pendingRecipients.map((r) => ({
+            ...r,
+            delivered: (msg.deliveredTo || []).includes(r.pubkey),
+          }));
+          setState('complete');
+          return false;
+        }
+
+        case MessageType.PRIVATE_SEND_ERROR: {
+          const errMsg = (message as any).error || 'Private send failed';
+          console.error('[background] private send error:', errMsg);
+          lastError = errMsg;
+          setState('error');
+          return false;
+        }
+
         case MessageType.START_UPLOAD: {
           if (message.target === 'offscreen') return false; // not for us
           // From popup "Upload & Share" — go to confirming, not directly uploading
@@ -786,18 +812,31 @@ export default defineBackground(() => {
 
         case MessageType.CONFIRM_UPLOAD: {
           const msg = message as any;
-          pendingPublishToNostr = msg.publishToNostr !== false;
+          const sharingMode: SharingMode = msg.sharingMode || 'public';
+          pendingSharingMode = sharingMode;
+          pendingPublishToNostr = sharingMode === 'public';
           pendingNoteContent = msg.noteContent;
+          pendingRecipients = msg.recipients || [];
+
           setState('uploading');
           getSettings().then((settings) => {
             const server = msg.serverOverride || settings.blossomServers[0];
-            return ensureOffscreenDocument().then(() =>
-              browser.runtime.sendMessage({
-                type: MessageType.START_UPLOAD,
-                target: 'offscreen',
-                server,
-              }),
-            );
+            return ensureOffscreenDocument().then(() => {
+              if (sharingMode === 'private') {
+                return browser.runtime.sendMessage({
+                  type: MessageType.SEND_PRIVATE,
+                  target: 'offscreen',
+                  server,
+                  recipients: pendingRecipients,
+                });
+              } else {
+                return browser.runtime.sendMessage({
+                  type: MessageType.START_UPLOAD,
+                  target: 'offscreen',
+                  server,
+                });
+              }
+            });
           }).catch((err) => {
             console.error('[background] confirm upload failed:', err);
             lastError = err instanceof Error ? err.message : String(err);
