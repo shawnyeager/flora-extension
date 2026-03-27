@@ -54,11 +54,25 @@
           <input type="text" id="confirm-server" class="field-input" placeholder="https://blossom.band" />
         </div>
         <div class="field">
-          <label class="check-label">
-            <input type="checkbox" id="confirm-publish" checked />
-            Publish note to Nostr
-          </label>
+          <label>Sharing</label>
+          <div id="sharing-mode-picker" class="sharing-mode-picker" role="radiogroup" aria-label="Sharing mode">
+            <button class="sharing-mode-btn active" data-mode="public" role="radio" aria-checked="true">Public</button>
+            <button class="sharing-mode-btn" data-mode="unlisted" role="radio" aria-checked="false">Unlisted</button>
+            <button class="sharing-mode-btn" data-mode="private" role="radio" aria-checked="false">Private</button>
+          </div>
+        </div>
+        <div id="public-options" class="field">
           <div id="confirm-relays" class="field-sub"></div>
+        </div>
+        <div id="private-options" style="display:none">
+          <div class="field">
+            <label for="recipient-input">Send to</label>
+            <div class="recipient-chips" id="recipient-chips"></div>
+            <div class="recipient-input-wrap">
+              <input type="text" id="recipient-input" class="field-input" placeholder="npub, name, or user@domain" autocomplete="off" />
+              <div id="recipient-dropdown" class="recipient-dropdown" role="listbox" aria-label="Recipient suggestions" style="display:none"></div>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label>Signing as</label>
@@ -87,8 +101,9 @@
     <div id="view-complete" class="view" style="display:none">
       <div class="complete-section">
         <div class="complete-icon">&#10003;</div>
-        <div class="complete-title">You're live</div>
+        <div id="complete-title" class="complete-title">You're live</div>
         <a id="result-link" class="result-link" target="_blank"></a>
+        <div id="complete-recipients" class="complete-recipients" style="display:none"></div>
         <div class="actions">
           <button id="btn-copy" class="btn-primary">Copy link</button>
           <button id="btn-new" class="btn-secondary">Record another</button>
