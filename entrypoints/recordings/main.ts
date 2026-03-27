@@ -431,15 +431,21 @@ function createCard(rec: RecordingMeta, index: number): HTMLElement {
   thumb.append(dur);
 
   // Upload status badge
-  if (rec.uploaded) {
+  if (rec.sharingMode === 'private') {
     const badge = document.createElement('span');
-    if (rec.noteId) {
-      badge.className = 'rec-badge rec-badge-posted';
-      badge.textContent = 'Posted';
-    } else {
-      badge.className = 'rec-badge rec-badge-uploaded';
-      badge.textContent = 'Uploaded';
-    }
+    badge.className = 'rec-badge rec-badge-private';
+    badge.textContent = 'Private';
+    badge.title = rec.recipients?.map((r: any) => r.name || r.pubkey.slice(0, 8)).join(', ') || '';
+    thumb.append(badge);
+  } else if (rec.noteId) {
+    const badge = document.createElement('span');
+    badge.className = 'rec-badge rec-badge-posted';
+    badge.textContent = 'Posted';
+    thumb.append(badge);
+  } else if (rec.uploaded) {
+    const badge = document.createElement('span');
+    badge.className = 'rec-badge rec-badge-uploaded';
+    badge.textContent = 'Uploaded';
     thumb.append(badge);
   }
 
