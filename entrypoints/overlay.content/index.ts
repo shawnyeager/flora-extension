@@ -399,8 +399,8 @@ export default defineContentScript({
           width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user',
         };
         try {
-          const { settings } = await browser.storage.local.get('settings');
-          const deviceId = settings?.selectedCameraDeviceId;
+          const result = await browser.storage.local.get('settings');
+          const deviceId = (result.settings as any)?.selectedCameraDeviceId;
           if (deviceId) {
             videoConstraints = {
               width: { ideal: 640 }, height: { ideal: 480 },

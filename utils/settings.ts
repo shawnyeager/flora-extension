@@ -20,10 +20,11 @@ const DEFAULTS: FloraSettings = {
 
 export async function getSettings(): Promise<FloraSettings> {
   const result = await browser.storage.local.get('settings');
-  if (!result.settings) return { ...DEFAULTS };
-  const merged = { ...DEFAULTS, ...result.settings };
+  const stored = result.settings as Partial<FloraSettings> | undefined;
+  if (!stored) return { ...DEFAULTS };
+  const merged = { ...DEFAULTS, ...stored };
   // Migration: derive defaultSharingMode from publishToNostr for existing users
-  if (!result.settings.defaultSharingMode) {
+  if (!stored.defaultSharingMode) {
     merged.defaultSharingMode = merged.publishToNostr ? 'public' : 'unlisted';
   }
   return merged;
