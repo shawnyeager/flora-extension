@@ -1,6 +1,8 @@
 import { MessageType, type Message, type RecordingControlsState } from '@/utils/messages';
 import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
-import { getSettings } from '@/utils/settings';
+import { getSettings, saveSettings, type SharingMode } from '@/utils/settings';
+import { SimplePool } from 'nostr-tools/pool';
+import { queryProfile } from 'nostr-tools/nip05';
 
 const OFFSCREEN_PATH = '/offscreen.html';
 
@@ -224,6 +226,79 @@ async function signEventDirect(
     return results?.[0]?.result || { ok: false, error: 'scripting.executeScript returned no result' };
   } catch (err: any) {
     return { ok: false, error: err.message };
+  }
+}
+
+async function fetchContacts(pubkey: string, relays: string[]): Promise<Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }>> {
+  const pool = new SimplePool();
+  try {
+    // Fetch Kind 3 (follow list)
+    const kind3 = await pool.get(relays, { kinds: [3], authors: [pubkey], limit: 1 });
+    if (!kind3) return [];
+
+    const followPubkeys = kind3.tags
+      .filter((t) => t[0] === 'p' && t[1])
+      .map((t) => t[1]);
+
+    if (followPubkeys.length === 0) return [];
+
+    // Fetch Kind 0 (profiles) for all follows — batch in groups of 50, parallelized
+    const seenPubkeys = new Set<string>();
+    const profiles: Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }> = [];
+    const batchSize = 50;
+    const batches: string[][] = [];
+    for (let i = 0; i < followPubkeys.length; i += batchSize) {
+      batches.push(followPubkeys.slice(i, i + batchSize));
+    }
+
+    const batchResults = await Promise.allSettled(
+      batches.map((batch) =>
+        pool.querySync(relays, { kinds: [0], authors: batch, limit: batch.length }),
+      ),
+    );
+
+    for (const result of batchResults) {
+      if (result.status !== 'fulfilled') continue;
+      for (const evt of result.value) {
+        if (seenPubkeys.has(evt.pubkey)) continue;
+        seenPubkeys.add(evt.pubkey);
+        try {
+          const meta = JSON.parse(evt.content);
+          profiles.push({
+            pubkey: evt.pubkey,
+            name: meta.display_name || meta.name || undefined,
+            avatar: meta.picture || undefined,
+            nip05: meta.nip05 || undefined,
+          });
+        } catch {
+          profiles.push({ pubkey: evt.pubkey });
+        }
+      }
+    }
+
+    // Include follows without profiles
+    for (const pk of followPubkeys) {
+      if (!seenPubkeys.has(pk)) {
+        profiles.push({ pubkey: pk });
+      }
+    }
+
+    return profiles;
+  } finally {
+    pool.close(relays);
+  }
+}
+
+async function fetchDmRelays(pubkey: string, relays: string[]): Promise<string[]> {
+  const pool = new SimplePool();
+  try {
+    const kind10050 = await pool.get(relays, { kinds: [10050], authors: [pubkey], limit: 1 });
+    if (!kind10050) return [];
+    return kind10050.tags
+      .filter((t) => t[0] === 'relay' && t[1])
+      .map((t) => t[1]);
+  } finally {
+    pool.close(relays);
   }
 }
 
@@ -766,6 +841,46 @@ export default defineBackground(() => {
         case MessageType.OPEN_SETTINGS: {
           browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
           return false;
+        }
+
+        case MessageType.FETCH_CONTACTS: {
+          getSettings()
+            .then((settings) => {
+              if (!settings.nostrPubkey) return sendResponse({ contacts: [] });
+              return fetchContacts(settings.nostrPubkey, settings.nostrRelays)
+                .then((contacts) => sendResponse({ contacts }));
+            })
+            .catch((err) => {
+              console.error('[background] FETCH_CONTACTS error:', err);
+              sendResponse({ contacts: [] });
+            });
+          return true;
+        }
+
+        case MessageType.RESOLVE_NIP05: {
+          const identifier = (message as any).identifier;
+          // NIP-05 resolution is an HTTPS fetch — no CORS issues from service worker
+          (async () => {
+            try {
+              const profile = await queryProfile(identifier);
+              sendResponse(profile ? { pubkey: profile.pubkey, relays: profile.relays } : { error: 'Not found' });
+            } catch (err: any) {
+              sendResponse({ error: err.message });
+            }
+          })();
+          return true;
+        }
+
+        case MessageType.FETCH_DM_RELAYS: {
+          const pubkey = (message as any).pubkey;
+          getSettings()
+            .then((settings) => fetchDmRelays(pubkey, settings.nostrRelays))
+            .then((relays) => sendResponse({ relays }))
+            .catch((err) => {
+              console.error('[background] FETCH_DM_RELAYS error:', err);
+              sendResponse({ relays: [] });
+            });
+          return true;
         }
 
         default:
