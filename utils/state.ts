@@ -15,7 +15,8 @@
  *   preview -> idle               (user discards)
  *   confirming -> uploading       (user confirms upload)
  *   confirming -> preview         (user clicks Back)
- *   uploading -> publishing       (upload complete)
+ *   uploading -> publishing       (upload complete, public mode)
+ *   uploading -> complete         (upload complete, unlisted/private mode)
  *   uploading -> error            (upload failed)
  *   publishing -> complete        (note published)
  *   complete -> idle              (user dismisses)
@@ -46,7 +47,7 @@ export const TRANSITIONS: Record<ExtensionState, ExtensionState[]> = {
   finalizing: ['preview'],
   preview: ['confirming', 'idle'],
   confirming: ['uploading', 'preview'],
-  uploading: ['publishing', 'error'],
+  uploading: ['publishing', 'complete', 'error'],
   publishing: ['complete'],
   complete: ['idle'],
   error: ['uploading', 'idle'],
