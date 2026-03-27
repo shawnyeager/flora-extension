@@ -1,5 +1,7 @@
 import { MessageType } from '@/utils/messages';
 import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
+import type { SharingMode } from '@/utils/settings';
+import { decode } from 'nostr-tools/nip19';
 
 // --- Element refs ---
 const settingsLink = document.getElementById('settings-link') as HTMLAnchorElement;
@@ -22,12 +24,19 @@ const viewConfirm = document.getElementById('view-confirm') as HTMLDivElement;
 const confirmVideo = document.getElementById('confirm-video') as HTMLVideoElement;
 const confirmMeta = document.getElementById('confirm-meta') as HTMLDivElement;
 const confirmServer = document.getElementById('confirm-server') as HTMLInputElement;
-const confirmPublish = document.getElementById('confirm-publish') as HTMLInputElement;
 const confirmRelays = document.getElementById('confirm-relays') as HTMLDivElement;
 const confirmIdentity = document.getElementById('confirm-identity') as HTMLDivElement;
 const confirmWarning = document.getElementById('confirm-warning') as HTMLDivElement;
 const btnConfirm = document.getElementById('btn-confirm') as HTMLButtonElement;
 const btnBack = document.getElementById('btn-back') as HTMLButtonElement;
+
+// Sharing mode
+const sharingModePicker = document.getElementById('sharing-mode-picker') as HTMLDivElement;
+const publicOptions = document.getElementById('public-options') as HTMLDivElement;
+const privateOptions = document.getElementById('private-options') as HTMLDivElement;
+const recipientInput = document.getElementById('recipient-input') as HTMLInputElement;
+const recipientChips = document.getElementById('recipient-chips') as HTMLDivElement;
+const recipientDropdown = document.getElementById('recipient-dropdown') as HTMLDivElement;
 
 // Progress view
 const viewProgress = document.getElementById('view-progress') as HTMLDivElement;
@@ -37,6 +46,8 @@ const progressDetail = document.getElementById('progress-detail') as HTMLDivElem
 
 // Complete view
 const viewComplete = document.getElementById('view-complete') as HTMLDivElement;
+const completeTitle = document.getElementById('complete-title') as HTMLDivElement;
+const completeRecipients = document.getElementById('complete-recipients') as HTMLDivElement;
 const resultLink = document.getElementById('result-link') as HTMLAnchorElement;
 const btnCopy = document.getElementById('btn-copy') as HTMLButtonElement;
 const btnNew = document.getElementById('btn-new') as HTMLButtonElement;
@@ -49,6 +60,23 @@ const btnErrorDiscard = document.getElementById('btn-error-discard') as HTMLButt
 
 let confirmLocked = false;
 let videoLoaded = false;
+
+// Sharing mode state
+let currentSharingMode: SharingMode = 'public';
+let selectedRecipients: Array<{
+  pubkey: string;
+  name?: string;
+  avatar?: string;
+  nip05?: string;
+  relays?: string[];
+  hasDmRelays?: boolean;
+}> = [];
+let contacts: Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }> = [];
+let contactsLoaded = false;
+let contactsLoading = false;
+let recentRecipients: Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }> = [];
+let highlightedIndex = -1;
+let lastConfirmData: ConfirmData | null = null;
 
 // Warn user before closing tab during protected states
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -156,11 +184,370 @@ interface ConfirmData {
   publishToNostr: boolean;
   fileSize: number;
   duration: number;
+  defaultSharingMode: string;
+  nip44Supported: boolean;
 }
 
 async function getConfirmData(): Promise<ConfirmData | null> {
   return browser.runtime.sendMessage({ type: MessageType.GET_CONFIRM_DATA });
 }
+
+// --- Sharing mode ---
+
+function setSharingMode(mode: SharingMode) {
+  currentSharingMode = mode;
+  sharingModePicker.querySelectorAll('.sharing-mode-btn').forEach((btn) => {
+    const isActive = (btn as HTMLElement).dataset.mode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-checked', String(isActive));
+  });
+  publicOptions.style.display = mode === 'public' ? 'block' : 'none';
+  privateOptions.style.display = mode === 'private' ? '' : 'none';
+  updateConfirmButton();
+}
+
+function updateConfirmButton() {
+  if (currentSharingMode === 'private') {
+    btnConfirm.disabled = selectedRecipients.length === 0;
+    btnConfirm.textContent = selectedRecipients.length === 0
+      ? 'Add recipients'
+      : `Send privately to ${selectedRecipients.length}`;
+  } else {
+    btnConfirm.disabled = false;
+    btnConfirm.textContent = currentSharingMode === 'unlisted' ? 'Upload' : 'Upload & Publish';
+  }
+}
+
+sharingModePicker.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.sharing-mode-btn') as HTMLElement;
+  if (!btn?.dataset.mode) return;
+  const mode = btn.dataset.mode as SharingMode;
+  if (mode === 'private') {
+    if (lastConfirmData && !lastConfirmData.nip44Supported) {
+      confirmWarning.textContent = 'Your signer extension does not support NIP-44 encryption. Update it or switch to nos2x/Alby.';
+      confirmWarning.style.display = 'block';
+      return;
+    }
+    if (!contactsLoaded && !contactsLoading) loadContacts();
+  }
+  confirmWarning.style.display = 'none';
+  setSharingMode(mode);
+});
+
+// --- Contact loading ---
+
+async function loadContacts() {
+  if (contactsLoading) return;
+  contactsLoading = true;
+  try {
+    const response = await browser.runtime.sendMessage({ type: MessageType.FETCH_CONTACTS });
+    contacts = response?.contacts || [];
+    contactsLoaded = true;
+
+    // If recipient input is focused, re-render dropdown with fresh contacts
+    if (document.activeElement === recipientInput) {
+      renderDropdown(recipientInput.value);
+    }
+  } catch (err) {
+    console.error('[review] failed to load contacts:', err);
+  } finally {
+    contactsLoading = false;
+  }
+
+  // Load recent recipients from storage
+  try {
+    const stored = await browser.storage.local.get('recentRecipients');
+    recentRecipients = (stored as any).recentRecipients || [];
+  } catch { /* ignore */ }
+}
+
+// --- Recipient rendering ---
+
+function renderChips() {
+  while (recipientChips.firstChild) recipientChips.removeChild(recipientChips.firstChild);
+  for (const r of selectedRecipients) {
+    const chip = document.createElement('div');
+    chip.className = 'recipient-chip';
+
+    if (r.avatar) {
+      const img = document.createElement('img');
+      img.src = r.avatar;
+      img.alt = '';
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = 'chip-avatar-placeholder';
+        ph.textContent = (r.name || r.pubkey)?.[0]?.toUpperCase() || '?';
+        img.replaceWith(ph);
+      };
+      chip.append(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'chip-avatar-placeholder';
+      ph.textContent = (r.name || r.pubkey)?.[0]?.toUpperCase() || '?';
+      chip.append(ph);
+    }
+
+    const name = document.createElement('span');
+    name.textContent = r.name || truncateKey(r.pubkey);
+    chip.append(name);
+
+    if (r.hasDmRelays === false) {
+      const warn = document.createElement('span');
+      warn.className = 'chip-warning';
+      warn.textContent = '\u26a0';
+      warn.title = 'No DM relays found \u2014 may not receive';
+      warn.setAttribute('aria-label', `Warning: ${r.name || truncateKey(r.pubkey)} has no DM relays`);
+      chip.append(warn);
+    }
+
+    const remove = document.createElement('button');
+    remove.className = 'chip-remove';
+    remove.textContent = '\u00d7';
+    remove.setAttribute('aria-label', `Remove ${r.name || truncateKey(r.pubkey)}`);
+    remove.addEventListener('click', () => {
+      selectedRecipients = selectedRecipients.filter((s) => s.pubkey !== r.pubkey);
+      renderChips();
+      updateConfirmButton();
+    });
+    chip.append(remove);
+
+    recipientChips.append(chip);
+  }
+}
+
+function renderDropdown(query: string) {
+  while (recipientDropdown.firstChild) recipientDropdown.removeChild(recipientDropdown.firstChild);
+  highlightedIndex = -1;
+
+  const q = query.toLowerCase().trim();
+  let matches: typeof contacts;
+
+  if (!q) {
+    // Show recent recipients when empty, excluding already-selected
+    matches = recentRecipients
+      .filter((r) => !selectedRecipients.some((s) => s.pubkey === r.pubkey))
+      .slice(0, 5);
+  } else {
+    if (!contactsLoaded && contactsLoading) {
+      // Show loading placeholder
+      const placeholder = document.createElement('div');
+      placeholder.className = 'recipient-option';
+      placeholder.textContent = 'Loading contacts\u2026';
+      recipientDropdown.append(placeholder);
+      recipientDropdown.style.display = 'block';
+      return;
+    }
+    matches = contacts.filter((c) => {
+      if (selectedRecipients.some((s) => s.pubkey === c.pubkey)) return false;
+      return (
+        c.name?.toLowerCase().includes(q) ||
+        c.nip05?.toLowerCase().includes(q) ||
+        c.pubkey.startsWith(q)
+      );
+    }).slice(0, 8);
+  }
+
+  if (matches.length === 0) {
+    recipientDropdown.style.display = 'none';
+    return;
+  }
+
+  for (const contact of matches) {
+    const opt = document.createElement('div');
+    opt.className = 'recipient-option';
+    opt.setAttribute('role', 'option');
+
+    if (contact.avatar) {
+      const img = document.createElement('img');
+      img.src = contact.avatar;
+      img.alt = '';
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = 'chip-avatar-placeholder';
+        ph.textContent = (contact.name || contact.pubkey)?.[0]?.toUpperCase() || '?';
+        img.replaceWith(ph);
+      };
+      opt.append(img);
+    }
+
+    const info = document.createElement('div');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'option-name';
+    nameEl.textContent = contact.name || truncateKey(contact.pubkey);
+    info.append(nameEl);
+    if (contact.nip05) {
+      const nip05El = document.createElement('div');
+      nip05El.className = 'option-nip05';
+      nip05El.textContent = contact.nip05;
+      info.append(nip05El);
+    }
+    opt.append(info);
+
+    opt.addEventListener('click', () => selectRecipient(contact));
+    recipientDropdown.append(opt);
+  }
+
+  recipientDropdown.style.display = 'block';
+}
+
+// --- Recipient selection ---
+
+async function selectRecipient(contact: { pubkey: string; name?: string; avatar?: string; nip05?: string }) {
+  if (selectedRecipients.some((r) => r.pubkey === contact.pubkey)) return;
+
+  // Optimistic: add chip immediately with unknown relay status
+  const recipient = {
+    ...contact,
+    relays: undefined as string[] | undefined,
+    hasDmRelays: undefined as boolean | undefined,
+  };
+  selectedRecipients.push(recipient);
+  recipientInput.value = '';
+  recipientDropdown.style.display = 'none';
+  renderChips();
+  updateConfirmButton();
+  recipientInput.focus();
+
+  // Fetch DM relays in background
+  const modeAtStart = currentSharingMode;
+  try {
+    const relayResult = await browser.runtime.sendMessage({
+      type: MessageType.FETCH_DM_RELAYS,
+      pubkey: contact.pubkey,
+    });
+
+    // Guard: recipient may have been removed while fetch was in progress
+    const still = selectedRecipients.find((r) => r.pubkey === contact.pubkey);
+    if (!still) return;
+
+    // Guard: mode may have switched during async
+    if (currentSharingMode !== modeAtStart) return;
+
+    const relays = relayResult?.relays || [];
+    still.relays = relays;
+    still.hasDmRelays = relays.length > 0;
+    renderChips();
+  } catch {
+    // If fetch fails, leave relay status unknown
+  }
+}
+
+// Handle npub paste and NIP-05 resolution
+async function handleDirectInput(value: string) {
+  const trimmed = value.trim();
+  const modeAtStart = currentSharingMode;
+
+  // npub
+  if (trimmed.startsWith('npub1')) {
+    try {
+      const decoded = decode(trimmed);
+      if (decoded.type === 'npub') {
+        const pubkey = decoded.data as string;
+        const existing = contacts.find((c) => c.pubkey === pubkey);
+        if (currentSharingMode === modeAtStart) {
+          await selectRecipient(existing || { pubkey });
+        }
+        return true;
+      }
+    } catch {
+      showInputError('Invalid npub');
+      return false;
+    }
+  }
+
+  // NIP-05
+  if (trimmed.includes('@')) {
+    try {
+      const result = await browser.runtime.sendMessage({
+        type: MessageType.RESOLVE_NIP05,
+        identifier: trimmed,
+      });
+      if (currentSharingMode !== modeAtStart) return false;
+      if (result?.pubkey) {
+        const existing = contacts.find((c) => c.pubkey === result.pubkey);
+        await selectRecipient(existing || { pubkey: result.pubkey, nip05: trimmed });
+        return true;
+      }
+    } catch { /* ignore */ }
+    showInputError('Could not resolve NIP-05');
+    return false;
+  }
+
+  // 64-char hex
+  if (/^[0-9a-f]{64}$/.test(trimmed)) {
+    const existing = contacts.find((c) => c.pubkey === trimmed);
+    if (currentSharingMode === modeAtStart) {
+      await selectRecipient(existing || { pubkey: trimmed });
+    }
+    return true;
+  }
+
+  return false;
+}
+
+function showInputError(msg: string) {
+  recipientInput.style.borderColor = '#ef4444';
+  // Show aria-live error
+  let errorEl = document.getElementById('recipient-error');
+  if (!errorEl) {
+    errorEl = document.createElement('div');
+    errorEl.id = 'recipient-error';
+    errorEl.setAttribute('aria-live', 'assertive');
+    errorEl.style.color = '#ef4444';
+    errorEl.style.fontSize = '12px';
+    errorEl.style.marginTop = '4px';
+    recipientInput.parentElement?.append(errorEl);
+  }
+  errorEl.textContent = msg;
+
+  setTimeout(() => {
+    recipientInput.style.borderColor = '';
+    if (errorEl) errorEl.textContent = '';
+  }, 2000);
+}
+
+// --- Recipient input event handlers ---
+
+recipientInput.addEventListener('input', () => {
+  renderDropdown(recipientInput.value);
+});
+
+recipientInput.addEventListener('focus', () => {
+  renderDropdown(recipientInput.value);
+});
+
+recipientInput.addEventListener('blur', () => {
+  recipientDropdown.style.display = 'none';
+});
+
+// Prevent blur when clicking dropdown options
+recipientDropdown.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+});
+
+recipientInput.addEventListener('keydown', async (e) => {
+  const options = recipientDropdown.querySelectorAll('.recipient-option');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    highlightedIndex = Math.min(highlightedIndex + 1, options.length - 1);
+    options.forEach((o, i) => o.classList.toggle('highlighted', i === highlightedIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    highlightedIndex = Math.max(highlightedIndex - 1, 0);
+    options.forEach((o, i) => o.classList.toggle('highlighted', i === highlightedIndex));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (highlightedIndex >= 0 && options[highlightedIndex]) {
+      (options[highlightedIndex] as HTMLElement).click();
+    } else if (recipientInput.value.trim()) {
+      await handleDirectInput(recipientInput.value);
+    }
+  } else if (e.key === 'Escape') {
+    recipientDropdown.style.display = 'none';
+  }
+});
+
+// --- Preview and Confirm ---
 
 async function showPreview() {
   await loadVideo();
@@ -191,6 +578,7 @@ async function showConfirm() {
 
   const data = await getConfirmData();
   if (!data) return;
+  lastConfirmData = data;
 
   const parts: string[] = [];
   if (data.fileSize) parts.push(formatBytes(data.fileSize));
@@ -198,19 +586,22 @@ async function showConfirm() {
   confirmMeta.textContent = parts.join(' \u00b7 ');
 
   confirmServer.value = data.server;
-  confirmPublish.checked = data.publishToNostr;
 
-  const updateRelays = () => {
-    confirmRelays.style.display = confirmPublish.checked && data.relays?.length ? 'block' : 'none';
-    confirmRelays.textContent = data.relays?.join(', ') || '';
-  };
-  updateRelays();
-  confirmPublish.onchange = updateRelays;
+  // Initialize sharing mode from settings default
+  const defaultMode = (data.defaultSharingMode || (data.publishToNostr ? 'public' : 'unlisted')) as SharingMode;
+  setSharingMode(defaultMode);
+
+  // Show relays for public mode
+  confirmRelays.textContent = data.relays?.join(', ') || '';
 
   renderSignerStatus(data, confirmIdentity, confirmWarning, btnConfirm);
 
+  // Reset recipient state
+  selectedRecipients = [];
+  renderChips();
+
   confirmLocked = false;
-  btnConfirm.textContent = 'Confirm Upload';
+  updateConfirmButton();
 }
 
 function renderSignerStatus(
@@ -304,12 +695,29 @@ btnConfirm.addEventListener('click', async () => {
   if (confirmLocked) return;
   confirmLocked = true;
   btnConfirm.disabled = true;
-  btnConfirm.textContent = 'Uploading\u2026';
+  btnConfirm.textContent = currentSharingMode === 'private' ? 'Encrypting\u2026' : 'Uploading\u2026';
+
+  // Save recent recipients for private mode
+  if (currentSharingMode === 'private' && selectedRecipients.length) {
+    const recent = selectedRecipients.map((r) => ({
+      pubkey: r.pubkey, name: r.name, avatar: r.avatar, nip05: r.nip05,
+    }));
+    try {
+      const stored = await browser.storage.local.get('recentRecipients');
+      const existing: any[] = (stored as any).recentRecipients || [];
+      const merged = [...recent, ...existing.filter((e: any) => !recent.some((r) => r.pubkey === e.pubkey))].slice(0, 20);
+      await browser.storage.local.set({ recentRecipients: merged });
+    } catch { /* ignore storage errors */ }
+  }
 
   await browser.runtime.sendMessage({
     type: MessageType.CONFIRM_UPLOAD,
     serverOverride: confirmServer.value.trim() || undefined,
-    publishToNostr: confirmPublish.checked,
+    publishToNostr: currentSharingMode === 'public',
+    sharingMode: currentSharingMode,
+    recipients: currentSharingMode === 'private'
+      ? selectedRecipients.map((r) => ({ pubkey: r.pubkey, name: r.name, relays: r.relays }))
+      : undefined,
   });
 });
 
@@ -333,7 +741,14 @@ btnNew.addEventListener('click', async () => {
 });
 
 btnRetry.addEventListener('click', async () => {
-  await browser.runtime.sendMessage({ type: MessageType.CONFIRM_UPLOAD, publishToNostr: true });
+  await browser.runtime.sendMessage({
+    type: MessageType.CONFIRM_UPLOAD,
+    publishToNostr: currentSharingMode === 'public',
+    sharingMode: currentSharingMode,
+    recipients: currentSharingMode === 'private'
+      ? selectedRecipients.map((r) => ({ pubkey: r.pubkey, name: r.name, relays: r.relays }))
+      : undefined,
+  });
 });
 
 btnErrorDiscard.addEventListener('click', async () => {
@@ -378,11 +793,24 @@ async function updateUI(state: ExtensionState) {
     case 'complete': {
       showView(viewComplete);
       const result = await browser.runtime.sendMessage({ type: MessageType.GET_RESULT });
-      const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
-      if (url) {
-        resultLink.href = url;
-        resultLink.textContent = url;
-        resultLink.style.display = 'block';
+
+      if (result?.sharingMode === 'private') {
+        completeTitle.textContent = 'Sent privately';
+        resultLink.style.display = 'none';
+        btnCopy.style.display = 'none';
+        const names = result.recipients?.map((r: any) => r.name || truncateKey(r.pubkey)).join(', ') || '';
+        completeRecipients.textContent = 'Delivered to ' + names;
+        completeRecipients.style.display = 'block';
+      } else {
+        completeTitle.textContent = result?.sharingMode === 'unlisted' ? 'Uploaded' : "You're live";
+        const url = result?.publishResult?.blossomUrl || result?.uploadResult?.url;
+        if (url) {
+          resultLink.href = url;
+          resultLink.textContent = url;
+          resultLink.style.display = 'block';
+        }
+        btnCopy.style.display = '';
+        completeRecipients.style.display = 'none';
       }
       break;
     }
