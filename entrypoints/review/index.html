@@ -16,43 +16,7 @@
       <video id="preview-video" controls></video>
       <div id="preview-meta" class="meta"></div>
 
-      <div class="destination-card">
-        <h2>Upload destination</h2>
-        <div class="field">
-          <label>Blossom server</label>
-          <div id="dest-server" class="field-value"></div>
-        </div>
-        <div class="field" id="relay-section">
-          <label>Nostr relays</label>
-          <div id="dest-relays" class="field-value"></div>
-        </div>
-        <div class="field">
-          <label>Identity</label>
-          <div id="dest-identity" class="field-value"></div>
-        </div>
-      </div>
-
-      <div id="signer-warning" class="warning" style="display:none"></div>
-
-      <div class="actions">
-        <button id="btn-upload" class="btn-primary">Upload &amp; Share</button>
-        <div class="actions-row">
-          <button id="btn-download" class="btn-secondary">Save to device</button>
-          <button id="btn-discard" class="btn-ghost">Discard</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="view-confirm" class="view" style="display:none">
-      <video id="confirm-video" controls></video>
-      <div id="confirm-meta" class="meta"></div>
-
       <div class="destination-card editable">
-        <h2>Review before sharing</h2>
-        <div class="field">
-          <label for="confirm-server">Upload to</label>
-          <input type="text" id="confirm-server" class="field-input" placeholder="https://blossom.band" />
-        </div>
         <div class="field">
           <label>Sharing</label>
           <div id="sharing-mode-picker" class="sharing-mode-picker" role="radiogroup" aria-label="Sharing mode">
@@ -61,8 +25,21 @@
             <button class="sharing-mode-btn" data-mode="private" role="radio" aria-checked="false">Private</button>
           </div>
         </div>
-        <div id="public-options" class="field">
-          <div id="confirm-relays" class="field-sub"></div>
+        <div id="public-options">
+          <div class="field">
+            <label>Blossom server</label>
+            <div id="dest-server" class="field-value"></div>
+          </div>
+          <div class="field" id="relay-section">
+            <label>Nostr relays</label>
+            <div id="dest-relays" class="field-value"></div>
+          </div>
+        </div>
+        <div id="unlisted-options" style="display:none">
+          <div class="field">
+            <label>Blossom server</label>
+            <div id="dest-server-unlisted" class="field-value"></div>
+          </div>
         </div>
         <div id="private-options" style="display:none">
           <div class="field">
@@ -75,16 +52,19 @@
           </div>
         </div>
         <div class="field">
-          <label>Signing as</label>
-          <div id="confirm-identity" class="field-value mono"></div>
+          <label>Identity</label>
+          <div id="dest-identity" class="field-value mono"></div>
         </div>
       </div>
 
-      <div id="confirm-warning" class="warning" style="display:none"></div>
+      <div id="signer-warning" class="warning" style="display:none"></div>
 
       <div class="actions">
-        <button id="btn-confirm" class="btn-primary">Confirm Upload</button>
-        <button id="btn-back" class="btn-secondary">Back</button>
+        <button id="btn-upload" class="btn-primary">Upload &amp; Share</button>
+        <div class="actions-row">
+          <button id="btn-download" class="btn-secondary">Save to device</button>
+          <button id="btn-discard" class="btn-ghost">Discard</button>
+        </div>
       </div>
     </div>
 
