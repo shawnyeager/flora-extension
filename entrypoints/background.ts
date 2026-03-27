@@ -314,7 +314,7 @@ async function fetchContacts(pubkey: string, relays: string[]): Promise<Array<{ 
           profiles.push({
             pubkey: evt.pubkey,
             name: meta.display_name || meta.name || undefined,
-            avatar: meta.picture || undefined,
+            avatar: (meta.picture && /^https?:\/\//.test(meta.picture)) ? meta.picture : undefined,
             nip05: meta.nip05 || undefined,
           });
         } catch {
@@ -748,6 +748,10 @@ export default defineBackground(() => {
 
         case MessageType.NIP44_ENCRYPT: {
           const msg = message as any;
+          if (typeof msg.recipientPubkey !== 'string' || !/^[0-9a-f]{64}$/.test(msg.recipientPubkey)) {
+            sendResponse({ ok: false, error: 'Invalid recipient pubkey' });
+            return true;
+          }
           findScriptableTab()
             .then(async (tabId) => {
               if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-44' });
@@ -974,7 +978,11 @@ export default defineBackground(() => {
 
         case MessageType.RESOLVE_NIP05: {
           const identifier = (message as any).identifier;
-          // NIP-05 resolution is an HTTPS fetch — no CORS issues from service worker
+          // Validate format to prevent SSRF via internal hostnames/IPs
+          if (typeof identifier !== 'string' || !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(identifier)) {
+            sendResponse({ error: 'Invalid NIP-05 identifier format' });
+            return true;
+          }
           (async () => {
             try {
               const profile = await queryProfile(identifier);

@@ -584,16 +584,20 @@ async function encryptVideo(buffer: ArrayBuffer): Promise<{
 }> {
   const key = crypto.getRandomValues(new Uint8Array(32));
   const nonce = crypto.getRandomValues(new Uint8Array(12));
-  const rawKey = new Uint8Array(key);
-  const cryptoKey = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
-  // Zero the source key material immediately after import
-  rawKey.fill(0);
+  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, cryptoKey, buffer);
   return { encrypted, key, nonce };
 }
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Random offset 0..172799 seconds (up to ~2 days) using crypto.getRandomValues */
+function randomTimestampOffset(): number {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return ((bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | ((bytes[3] & 0x7f) << 24)) >>> 0) % 172800;
 }
 
 // --- NIP-59 Gift Wrapping ---
@@ -614,17 +618,11 @@ async function giftWrapKind15(
   // Layer 1: Seal (kind 13) — encrypt rumor with NIP-44 via signer
   const sealContent = await nip44Encrypt(recipientPubkey, rumorJson);
 
-  // Randomize created_at up to 2 days in the past for privacy (using crypto.getRandomValues)
-  const randomBytes = new Uint8Array(4);
-  crypto.getRandomValues(randomBytes);
-  const randomOffset = (randomBytes[0] | (randomBytes[1] << 8) | (randomBytes[2] << 16) | ((randomBytes[3] & 0x7f) << 24)) >>> 0;
-  const sealTimestampOffset = randomOffset % 172800;
-
   const sealDraft = {
     kind: 13,
     content: sealContent,
     tags: [] as string[][],
-    created_at: Math.floor(Date.now() / 1000) - sealTimestampOffset,
+    created_at: Math.floor(Date.now() / 1000) - randomTimestampOffset(),
   };
 
   // Sign seal with real identity via NIP-07
@@ -637,17 +635,11 @@ async function giftWrapKind15(
   const conversationKey = nip44.utils.getConversationKey(ephemeralSk, recipientPubkey);
   const wrapContent = nip44.encrypt(JSON.stringify(signedSeal), conversationKey);
 
-  // Randomize wrap timestamp too
-  const wrapRandomBytes = new Uint8Array(4);
-  crypto.getRandomValues(wrapRandomBytes);
-  const wrapRandomOffset = (wrapRandomBytes[0] | (wrapRandomBytes[1] << 8) | (wrapRandomBytes[2] << 16) | ((wrapRandomBytes[3] & 0x7f) << 24)) >>> 0;
-  const wrapTimestampOffset = wrapRandomOffset % 172800;
-
   const wrap = finalizeEvent({
     kind: 1059,
     content: wrapContent,
     tags: [['p', recipientPubkey]],
-    created_at: Math.floor(Date.now() / 1000) - wrapTimestampOffset,
+    created_at: Math.floor(Date.now() / 1000) - randomTimestampOffset(),
   }, ephemeralSk);
 
   // Zero ephemeral secret key
@@ -700,19 +692,16 @@ async function sendPrivate(
 
     // 3. Upload encrypted blob to Blossom
     const encryptedBlob = new Blob([encrypted], { type: 'application/octet-stream' });
-    const primaryServer = server;
-    if (!primaryServer) throw new Error('No Blossom server configured');
-
-    console.log('[offscreen] uploading encrypted blob (' + encryptedBlob.size + ' bytes) to ' + primaryServer);
+    if (!server) throw new Error('No Blossom server configured');
 
     const blossomSigner = createSigner();
-    const client = new BlossomClient(primaryServer, blossomSigner);
+    const client = new BlossomClient(server, blossomSigner);
 
     browser.runtime.sendMessage({
       type: MessageType.UPLOAD_PROGRESS,
       bytesUploaded: 0,
       totalBytes: encryptedBlob.size,
-      serverName: primaryServer,
+      serverName: server,
     });
 
     const descriptor = await client.uploadBlob(encryptedBlob, { auth: true });
@@ -813,7 +802,7 @@ async function sendPrivate(
       type: MessageType.PRIVATE_SEND_COMPLETE,
       recipientCount: sent,
       encryptedBlobHash,
-      deliveredPubkeys,
+      deliveredTo: deliveredPubkeys,
     });
   } catch (err) {
     console.error('[offscreen] private send error:', err);
