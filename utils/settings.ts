@@ -11,7 +11,7 @@ export interface FloraSettings {
 
 const DEFAULTS: FloraSettings = {
   blossomServers: ['https://blossom.primal.net', 'https://blossom.nostr.build'],
-  nostrRelays: ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.nostr.band'],
+  nostrRelays: ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net'],
   publishToNostr: false,
   nostrPubkey: '',
   selectedCameraDeviceId: null,
