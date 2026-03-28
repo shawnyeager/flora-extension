@@ -13,13 +13,16 @@ Flora is a Chrome extension for fast, frictionless screen recording on decentral
 - **Framework**: [WXT](https://wxt.dev) (Vite-based Chrome extension toolkit), TypeScript, Chrome MV3
 - **Encoding**: [mediabunny](https://github.com/nicenathapong/mediabunny) (WebCodecs MP4 muxing — AV1 / VP9 / H.264)
 - **Storage**: [Blossom](https://github.com/hzrd149/blossom) (blossom-client-sdk)
-- **Protocol**: [Nostr](https://nostr.com/) (nostr-tools), NIP-07 signing
+- **Protocol**: [Nostr](https://nostr.com/) (nostr-tools), NIP-07 signing, NIP-17 private DMs, NIP-44 encryption, NIP-59 gift wrap
 
 ## Features
 
 - **Screen recording** with system audio, microphone, and optional webcam overlay
 - **Webcam bubble** — resizable (S/M/L), free-drag anywhere on screen, persisted position and size
 - **WebCodecs encoding** — hardware-accelerated MP4 output (AV1 > VP9 > H.264 fallback)
+- **Three sharing modes** — Public (Blossom + Nostr note), Unlisted (Blossom link only), or Private (encrypted, NIP-17)
+- **Private sharing** — AES-256-GCM encrypted video, delivered via NIP-17 Kind 15 gift-wrapped messages to selected recipients
+- **Recipient picker** — search your Nostr follow list, paste npub or NIP-05, see DM relay status per recipient
 - **Blossom upload** — recordings stored on decentralized file servers
 - **Nostr publishing** — optionally publish a note with your recording link to configured relays
 - **NIP-07 signing** — uses your existing Nostr signer extension (Nos2x, Alby, etc.)
@@ -58,9 +61,9 @@ Then load `.output/chrome-mv3/` as an unpacked extension (same steps 3-6 above).
 2. **Hit Record** — choose a tab, window, or entire screen
 3. **Record** — pause, resume, toggle mic/webcam from the popup controls
 4. **Stop** — Flora encodes your recording into an MP4
-5. **Review** — preview your recording, add a note, choose where to upload
-6. **Upload & Share** — upload to Blossom, optionally publish to Nostr
-7. **Copy the link** — share the Blossom URL or Nostr note link anywhere
+5. **Review** — preview your recording, choose sharing mode (Public / Unlisted / Private)
+6. **Share** — Public uploads to Blossom and publishes a Nostr note; Unlisted uploads without a note; Private encrypts and sends directly to selected recipients
+7. **Done** — copy the Blossom link (Public/Unlisted) or see delivery confirmation (Private)
 
 ### Settings
 
@@ -69,10 +72,21 @@ Open the settings page from the popup menu to configure:
 - **Blossom servers** — where recordings are uploaded (defaults: `blossom.primal.net`, `blossom.nostr.build`)
 - **Nostr relays** — where notes are published (defaults: `nos.lol`, `relay.damus.io`, `relay.primal.net`, `relay.nostr.band`)
 - **Publish to Nostr** — toggle automatic note publishing after upload
+- **Default sharing mode** — set whether new recordings default to Public, Unlisted, or Private
 
 ### NIP-07 Signing
 
 Flora uses the [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md) standard to sign Nostr events. You need a NIP-07 signer extension installed (like [Nos2x](https://github.com/nicehash/nos2x) or [Alby](https://getalby.com/)) and an active web tab for signing to work. Your pubkey is auto-saved after the first successful signing, or you can enter it manually as an npub in Settings.
+
+### Private Sharing
+
+Private mode encrypts your recording with AES-256-GCM before uploading to Blossom. The encrypted blob is meaningless without the decryption key, which is delivered only to your chosen recipients via [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) encrypted direct messages (Kind 15 file messages, gift-wrapped per [NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md)).
+
+Recipients view the video in any Nostr client that supports NIP-17 file messages (0xchat, Amethyst).
+
+Requirements for Private mode:
+- A NIP-07 signer with NIP-44 encryption support (nos2x works)
+- Recipients need Nostr identities (npub) and ideally published DM relay lists (Kind 10050)
 
 ## Development
 
@@ -147,6 +161,8 @@ Flora runs across four Chrome extension contexts:
 │                             │   - Audio mixing       │  │
 │                             │   - WebCodecs encode   │  │
 │                             │   - Blossom upload     │  │
+│                             │   - AES-GCM encryption │  │
+│                             │   - NIP-59 gift wrap   │  │
 │                             │   - Nostr publish      │  │
 │                             │   - IndexedDB storage  │  │
 │                             └────────────────────────┘  │
@@ -179,10 +195,11 @@ Injected into web pages. Renders a draggable webcam overlay (Shadow DOM), bridge
 
 ```
 idle → initializing → awaiting_media → countdown → recording
-  → finalizing → preview → confirming → uploading → publishing → complete
+  → finalizing → preview → uploading → publishing → complete
+                                    ↘ complete  (unlisted/private skip publishing)
 ```
 
-States from `finalizing` onward are protected — the UI blocks dismissal to prevent data loss during encoding, upload, or publishing.
+States from `finalizing` onward are protected — the UI blocks dismissal to prevent data loss during encoding, upload, or publishing. For private shares, `uploading` covers encryption, Blossom upload, and gift-wrap delivery in one pass.
 
 ### Key Dependencies
 
@@ -191,7 +208,7 @@ States from `finalizing` onward are protected — the UI blocks dismissal to pre
 | [`wxt`](https://wxt.dev) | Chrome extension framework (Vite-based, MV3) |
 | [`mediabunny`](https://github.com/nicenathapong/mediabunny) | WebCodecs video/audio encoding and MP4 muxing |
 | [`blossom-client-sdk`](https://github.com/hzrd149/blossom-client-sdk) | Blossom file server upload/retrieval |
-| [`nostr-tools`](https://github.com/nbd-wtf/nostr-tools) | Nostr event creation, signing, relay management |
+| [`nostr-tools`](https://github.com/nbd-wtf/nostr-tools) | Nostr event creation, signing, relay management, NIP-44/NIP-59 |
 
 ## Project Structure
 
