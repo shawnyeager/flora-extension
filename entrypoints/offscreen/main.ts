@@ -12,6 +12,8 @@ import {
 } from 'mediabunny';
 import { BlossomClient } from 'blossom-client-sdk';
 import { SimplePool } from 'nostr-tools/pool';
+import { generateSecretKey, getPublicKey as getKeyPublicKey, finalizeEvent, getEventHash, type VerifiedEvent } from 'nostr-tools/pure';
+import { v2 as nip44 } from 'nostr-tools/nip44';
 
 console.log('[offscreen] document loaded');
 
@@ -559,6 +561,283 @@ async function getPublicKey(): Promise<string> {
   return response.data;
 }
 
+// --- NIP-44 Encrypt (routes through background -> NIP-07 signer) ---
+
+async function nip44Encrypt(recipientPubkey: string, plaintext: string): Promise<string> {
+  const response = await browser.runtime.sendMessage({
+    type: MessageType.NIP44_ENCRYPT,
+    recipientPubkey,
+    plaintext,
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || 'NIP-44 encryption failed');
+  }
+  return response.data;
+}
+
+// --- AES-GCM Encryption ---
+
+async function encryptVideo(buffer: ArrayBuffer): Promise<{
+  encrypted: ArrayBuffer;
+  key: Uint8Array;
+  nonce: Uint8Array;
+}> {
+  const key = crypto.getRandomValues(new Uint8Array(32));
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, cryptoKey, buffer);
+  return { encrypted, key, nonce };
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Random offset 0..172799 seconds (up to ~2 days) using crypto.getRandomValues */
+function randomTimestampOffset(): number {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return ((bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | ((bytes[3] & 0x7f) << 24)) >>> 0) % 172800;
+}
+
+// --- NIP-59 Gift Wrapping ---
+
+async function giftWrapKind15(
+  rumor: { kind: number; content: string; tags: string[][]; created_at: number; pubkey: string },
+  recipientPubkey: string,
+): Promise<VerifiedEvent> {
+  // Compute rumor ID per NIP-01
+  const rumorWithId = { ...rumor, id: getEventHash(rumor as any) };
+
+  // NIP-44 payload size guard (< 64000 bytes to stay within NIP-44 limits)
+  const rumorJson = JSON.stringify(rumorWithId);
+  if (new TextEncoder().encode(rumorJson).length >= 64000) {
+    throw new Error('Rumor payload too large for NIP-44 encryption (>= 64KB)');
+  }
+
+  // Layer 1: Seal (kind 13) — encrypt rumor with NIP-44 via signer
+  const sealContent = await nip44Encrypt(recipientPubkey, rumorJson);
+
+  const sealDraft = {
+    kind: 13,
+    content: sealContent,
+    tags: [] as string[][],
+    created_at: Math.floor(Date.now() / 1000) - randomTimestampOffset(),
+  };
+
+  // Sign seal with real identity via NIP-07
+  const signer = createSigner();
+  const signedSeal = await signer(sealDraft);
+
+  // Layer 2: Gift Wrap (kind 1059) — encrypt seal with ephemeral key
+  const ephemeralSk = generateSecretKey();
+  const ephemeralPk = getKeyPublicKey(ephemeralSk);
+  const conversationKey = nip44.utils.getConversationKey(ephemeralSk, recipientPubkey);
+  const wrapContent = nip44.encrypt(JSON.stringify(signedSeal), conversationKey);
+
+  const wrap = finalizeEvent({
+    kind: 1059,
+    content: wrapContent,
+    tags: [['p', recipientPubkey]],
+    created_at: Math.floor(Date.now() / 1000) - randomTimestampOffset(),
+  }, ephemeralSk);
+
+  // Zero ephemeral secret key
+  ephemeralSk.fill(0);
+
+  return wrap;
+}
+
+// --- Private Sending ---
+
+async function sendPrivate(
+  server: string,
+  recipients: Array<{ pubkey: string; name?: string; relays?: string[] }>,
+) {
+  try {
+    // 1. Get the latest recording from IDB using by_timestamp index with reverse cursor
+    const db = await openDB();
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+    const index = store.index('by_timestamp');
+
+    const recording = await new Promise<any>((resolve, reject) => {
+      const req = index.openCursor(null, 'prev');
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (cursor) {
+          resolve(cursor.value);
+        } else {
+          reject(new Error('No recording found'));
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+
+    const originalBuffer: ArrayBuffer = recording.data;
+    const originalHash = recording.hash;
+    // Null recording.data to reduce memory pressure
+    recording.data = null;
+
+    // 2. Encrypt the video
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_PROGRESS,
+      bytesUploaded: 0,
+      totalBytes: originalBuffer.byteLength,
+      serverName: 'Encrypting\u2026',
+    });
+
+    const { encrypted, key, nonce } = await encryptVideo(originalBuffer);
+
+    // 3. Upload encrypted blob to Blossom
+    const encryptedBlob = new Blob([encrypted], { type: 'application/octet-stream' });
+    if (!server) throw new Error('No Blossom server configured');
+
+    const blossomSigner = createSigner();
+    const client = new BlossomClient(server, blossomSigner);
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_PROGRESS,
+      bytesUploaded: 0,
+      totalBytes: encryptedBlob.size,
+      serverName: server,
+    });
+
+    const descriptor = await client.uploadBlob(encryptedBlob, { auth: true });
+    const encryptedBlobHash = descriptor.sha256;
+    const blossomUrl = descriptor.url;
+
+    console.log('[offscreen] encrypted blob uploaded: ' + blossomUrl);
+
+    // 4. Get sender pubkey for the rumor
+    const senderPubkey = await getPublicKey();
+
+    // 5. Build Kind 15 rumor and gift-wrap for each recipient
+    // Include sender as a gift-wrap recipient (NIP-17 convention)
+    const allRecipients = [
+      ...recipients,
+      { pubkey: senderPubkey, name: 'self', relays: [] as string[] },
+    ];
+
+    browser.runtime.sendMessage({
+      type: MessageType.UPLOAD_PROGRESS,
+      bytesUploaded: encryptedBlob.size,
+      totalBytes: encryptedBlob.size,
+      serverName: 'Sending to recipients\u2026',
+    });
+
+    // Build gift wraps sequentially (each requires NIP-44 encryption via signer)
+    const wrapsWithRelays: Array<{ wrap: VerifiedEvent; relays: string[] }> = [];
+    for (const recipient of allRecipients) {
+      const rumor = {
+        kind: 15,
+        content: blossomUrl,
+        pubkey: senderPubkey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['p', recipient.pubkey],
+          ['file-type', 'video/mp4'],
+          ['encryption-algorithm', 'aes-gcm'],
+          ['decryption-key', bytesToHex(key)],
+          ['decryption-nonce', bytesToHex(nonce)],
+          ['x', encryptedBlobHash],
+          ['ox', originalHash],
+          ['size', String(encrypted.byteLength)],
+        ],
+      };
+
+      const wrap = await giftWrapKind15(rumor, recipient.pubkey);
+
+      const targetRelays = recipient.relays?.length
+        ? recipient.relays
+        : ['wss://nos.lol', 'wss://relay.damus.io'];
+
+      wrapsWithRelays.push({ wrap, relays: targetRelays });
+    }
+
+    // Zero key material after all gift wraps are built
+    key.fill(0);
+    nonce.fill(0);
+
+    // 6. Publish all gift wraps in parallel
+    const pool = new SimplePool();
+    let sent = 0;
+    const deliveredPubkeys: string[] = [];
+
+    try {
+      const publishResults = await Promise.allSettled(
+        wrapsWithRelays.map(async ({ wrap, relays }, i) => {
+          const recipient = allRecipients[i];
+          const publishPromises = pool.publish(relays, wrap);
+          const results = await Promise.allSettled(
+            publishPromises.map((p) =>
+              Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))]),
+            ),
+          );
+          const accepted = results.filter((r) => r.status === 'fulfilled').length;
+          if (accepted > 0) {
+            sent++;
+            deliveredPubkeys.push(recipient.pubkey);
+            console.log('[offscreen] gift wrap sent to ' + recipient.pubkey.slice(0, 8) + '\u2026 (' + sent + '/' + allRecipients.length + ')');
+          } else {
+            console.error('[offscreen] failed to send to ' + recipient.pubkey.slice(0, 8) + '\u2026: all relays rejected');
+          }
+        }),
+      );
+    } finally {
+      const allRelays = wrapsWithRelays.flatMap(({ relays }) => relays);
+      pool.close([...new Set(allRelays)]);
+    }
+
+    // Guard: if no deliveries succeeded, throw
+    if (sent === 0) {
+      throw new Error('All gift wrap deliveries failed — no relays accepted the events');
+    }
+
+    // 7. Mark recording in IDB
+    await markPrivate(originalHash, encryptedBlobHash, recipients);
+
+    browser.runtime.sendMessage({
+      type: MessageType.PRIVATE_SEND_COMPLETE,
+      recipientCount: sent,
+      encryptedBlobHash,
+      deliveredTo: deliveredPubkeys,
+    });
+  } catch (err) {
+    console.error('[offscreen] private send error:', err);
+    browser.runtime.sendMessage({
+      type: MessageType.PRIVATE_SEND_ERROR,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function markPrivate(
+  hash: string,
+  encryptedBlobHash: string,
+  recipients: Array<{ pubkey: string; name?: string }>,
+): Promise<boolean> {
+  const db = await openDB();
+  const tx = db.transaction('recordings', 'readwrite');
+  const store = tx.objectStore('recordings');
+  return new Promise((resolve) => {
+    const getReq = store.get(hash);
+    getReq.onsuccess = () => {
+      const record = getReq.result;
+      if (!record) { db.close(); resolve(false); return; }
+      record.uploaded = true;
+      record.sharingMode = 'private';
+      record.encryptedBlobHash = encryptedBlobHash;
+      record.recipients = recipients.map((r) => ({ pubkey: r.pubkey, name: r.name }));
+      const putReq = store.put(record);
+      putReq.onsuccess = () => { db.close(); resolve(true); };
+      putReq.onerror = () => { db.close(); resolve(false); };
+    };
+    getReq.onerror = () => { db.close(); resolve(false); };
+  });
+}
+
 // --- Blossom Upload ---
 
 async function uploadRecording(server: string) {
@@ -773,6 +1052,13 @@ browser.runtime.onMessage.addListener(
       case MessageType.DELETE_RECORDINGS:
         deleteRecordings((message as any).hashes).then((count) => sendResponse({ ok: true, count }));
         return true;
+
+      case MessageType.SEND_PRIVATE: {
+        const msg = message as any;
+        sendPrivate(msg.server, msg.recipients);
+        sendResponse({ ok: true });
+        return false;
+      }
 
       default:
         return false;

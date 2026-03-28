@@ -16,19 +16,44 @@
       <video id="preview-video" controls></video>
       <div id="preview-meta" class="meta"></div>
 
-      <div class="destination-card">
-        <h2>Upload destination</h2>
+      <div class="destination-card editable">
         <div class="field">
-          <label>Blossom server</label>
-          <div id="dest-server" class="field-value"></div>
+          <label>Sharing</label>
+          <div id="sharing-mode-picker" class="sharing-mode-picker" role="radiogroup" aria-label="Sharing mode">
+            <button class="sharing-mode-btn active" data-mode="public" role="radio" aria-checked="true">Public</button>
+            <button class="sharing-mode-btn" data-mode="unlisted" role="radio" aria-checked="false">Unlisted</button>
+            <button class="sharing-mode-btn" data-mode="private" role="radio" aria-checked="false">Private</button>
+          </div>
         </div>
-        <div class="field" id="relay-section">
-          <label>Nostr relays</label>
-          <div id="dest-relays" class="field-value"></div>
+        <div id="public-options">
+          <div class="field">
+            <label>Blossom server</label>
+            <div id="dest-server" class="field-value"></div>
+          </div>
+          <div class="field" id="relay-section">
+            <label>Nostr relays</label>
+            <div id="dest-relays" class="field-value"></div>
+          </div>
+        </div>
+        <div id="unlisted-options" style="display:none">
+          <div class="field">
+            <label>Blossom server</label>
+            <div id="dest-server-unlisted" class="field-value"></div>
+          </div>
+        </div>
+        <div id="private-options" style="display:none">
+          <div class="field">
+            <label for="recipient-input">Send to</label>
+            <div class="recipient-chips" id="recipient-chips"></div>
+            <div class="recipient-input-wrap">
+              <input type="text" id="recipient-input" class="field-input" placeholder="npub, name, or user@domain" autocomplete="off" />
+              <div id="recipient-dropdown" class="recipient-dropdown" role="listbox" aria-label="Recipient suggestions" style="display:none"></div>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label>Identity</label>
-          <div id="dest-identity" class="field-value"></div>
+          <div id="dest-identity" class="field-value mono"></div>
         </div>
       </div>
 
@@ -40,37 +65,6 @@
           <button id="btn-download" class="btn-secondary">Save to device</button>
           <button id="btn-discard" class="btn-ghost">Discard</button>
         </div>
-      </div>
-    </div>
-
-    <div id="view-confirm" class="view" style="display:none">
-      <video id="confirm-video" controls></video>
-      <div id="confirm-meta" class="meta"></div>
-
-      <div class="destination-card editable">
-        <h2>Review before sharing</h2>
-        <div class="field">
-          <label for="confirm-server">Upload to</label>
-          <input type="text" id="confirm-server" class="field-input" placeholder="https://blossom.band" />
-        </div>
-        <div class="field">
-          <label class="check-label">
-            <input type="checkbox" id="confirm-publish" checked />
-            Publish note to Nostr
-          </label>
-          <div id="confirm-relays" class="field-sub"></div>
-        </div>
-        <div class="field">
-          <label>Signing as</label>
-          <div id="confirm-identity" class="field-value mono"></div>
-        </div>
-      </div>
-
-      <div id="confirm-warning" class="warning" style="display:none"></div>
-
-      <div class="actions">
-        <button id="btn-confirm" class="btn-primary">Confirm Upload</button>
-        <button id="btn-back" class="btn-secondary">Back</button>
       </div>
     </div>
 
@@ -87,8 +81,9 @@
     <div id="view-complete" class="view" style="display:none">
       <div class="complete-section">
         <div class="complete-icon">&#10003;</div>
-        <div class="complete-title">You're live</div>
+        <div id="complete-title" class="complete-title">You're live</div>
         <a id="result-link" class="result-link" target="_blank"></a>
+        <div id="complete-recipients" class="complete-recipients" style="display:none"></div>
         <div class="actions">
           <button id="btn-copy" class="btn-primary">Copy link</button>
           <button id="btn-new" class="btn-secondary">Record another</button>

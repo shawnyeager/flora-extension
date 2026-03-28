@@ -1,4 +1,5 @@
 import type { ExtensionState } from './state';
+import type { SharingMode } from './settings';
 
 export const MessageType = {
   // Popup/Content -> Background
@@ -47,6 +48,9 @@ export const MessageType = {
   NIP07_SIGN: 'nip07_sign',
   NIP07_GET_PUBKEY: 'nip07_get_pubkey',
 
+  // NIP-44 encryption proxy (via background -> scripting.executeScript)
+  NIP44_ENCRYPT: 'nip44_encrypt',
+
   // Result retrieval
   GET_RESULT: 'get_result',
   GET_ERROR: 'get_error',
@@ -58,6 +62,16 @@ export const MessageType = {
   GET_CONFIRM_DATA: 'get_confirm_data',
   CONFIRM_UPLOAD: 'confirm_upload',
   BACK_TO_PREVIEW: 'back_to_preview',
+
+  // Private sharing
+  SEND_PRIVATE: 'send_private',
+  PRIVATE_SEND_COMPLETE: 'private_send_complete',
+  PRIVATE_SEND_ERROR: 'private_send_error',
+
+  // Contact loading
+  FETCH_CONTACTS: 'fetch_contacts',
+  RESOLVE_NIP05: 'resolve_nip05',
+  FETCH_DM_RELAYS: 'fetch_dm_relays',
 
   // Recording library
   LIST_RECORDINGS: 'list_recordings',
@@ -222,6 +236,12 @@ export interface Nip07GetPubkeyMessage extends BaseMessage {
   type: typeof MessageType.NIP07_GET_PUBKEY;
 }
 
+export interface Nip44EncryptMessage extends BaseMessage {
+  type: typeof MessageType.NIP44_ENCRYPT;
+  recipientPubkey: string;
+  plaintext: string;
+}
+
 export interface GetResultMessage extends BaseMessage {
   type: typeof MessageType.GET_RESULT;
 }
@@ -234,11 +254,19 @@ export interface GetConfirmDataMessage extends BaseMessage {
   type: typeof MessageType.GET_CONFIRM_DATA;
 }
 
+export interface RecipientInfo {
+  pubkey: string;
+  name?: string;
+  relays?: string[];
+}
+
 export interface ConfirmUploadMessage extends BaseMessage {
   type: typeof MessageType.CONFIRM_UPLOAD;
   serverOverride?: string;
   publishToNostr: boolean;
   noteContent?: string;
+  sharingMode: SharingMode;
+  recipients?: RecipientInfo[];
 }
 
 export interface BackToPreviewMessage extends BaseMessage {
@@ -248,6 +276,39 @@ export interface BackToPreviewMessage extends BaseMessage {
 export interface Nip07ProbeMessage extends BaseMessage {
   type: typeof MessageType.NIP07_PROBE;
   tabId?: number;
+}
+
+export interface SendPrivateMessage extends BaseMessage {
+  type: typeof MessageType.SEND_PRIVATE;
+  target: 'offscreen';
+  server: string;
+  recipients: RecipientInfo[];
+}
+
+export interface PrivateSendCompleteMessage extends BaseMessage {
+  type: typeof MessageType.PRIVATE_SEND_COMPLETE;
+  recipientCount: number;
+  encryptedBlobHash: string;
+  deliveredTo: string[]; // pubkeys that were successfully delivered
+}
+
+export interface PrivateSendErrorMessage extends BaseMessage {
+  type: typeof MessageType.PRIVATE_SEND_ERROR;
+  error: string;
+}
+
+export interface FetchContactsMessage extends BaseMessage {
+  type: typeof MessageType.FETCH_CONTACTS;
+}
+
+export interface ResolveNip05Message extends BaseMessage {
+  type: typeof MessageType.RESOLVE_NIP05;
+  identifier: string;
+}
+
+export interface FetchDmRelaysMessage extends BaseMessage {
+  type: typeof MessageType.FETCH_DM_RELAYS;
+  pubkey: string;
 }
 
 // Recording library
@@ -260,6 +321,9 @@ export interface RecordingMeta {
   blossomUrl?: string;
   noteId?: string;
   thumbnail?: string;
+  sharingMode?: SharingMode;
+  encryptedBlobHash?: string;
+  recipients?: Array<{ pubkey: string; name?: string }>;
 }
 
 export interface ListRecordingsMessage extends BaseMessage {
@@ -343,12 +407,19 @@ export type Message =
   | PublishErrorMessage
   | Nip07SignMessage
   | Nip07GetPubkeyMessage
+  | Nip44EncryptMessage
   | GetResultMessage
   | GetErrorMessage
   | GetConfirmDataMessage
   | ConfirmUploadMessage
   | BackToPreviewMessage
   | Nip07ProbeMessage
+  | SendPrivateMessage
+  | PrivateSendCompleteMessage
+  | PrivateSendErrorMessage
+  | FetchContactsMessage
+  | ResolveNip05Message
+  | FetchDmRelaysMessage
   | ListRecordingsMessage
   | DeleteRecordingMessage
   | MarkUploadedMessage

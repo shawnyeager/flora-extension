@@ -295,6 +295,12 @@ body {
   color: var(--fl-violet);
 }
 
+/* Private — sent via encrypted DM */
+.rec-badge-private {
+  background: rgba(155, 110, 199, 0.2);
+  color: var(--fl-violet);
+}
+
 /* --- Checkbox (Google Photos pattern) --- */
 
 .rec-check {

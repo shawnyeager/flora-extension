@@ -1,6 +1,8 @@
 import { MessageType, type Message, type RecordingControlsState } from '@/utils/messages';
 import { PROTECTED_STATES, type ExtensionState } from '@/utils/state';
-import { getSettings } from '@/utils/settings';
+import { getSettings, saveSettings, type SharingMode } from '@/utils/settings';
+import { SimplePool } from 'nostr-tools/pool';
+import { queryProfile } from 'nostr-tools/nip05';
 
 const OFFSCREEN_PATH = '/offscreen.html';
 
@@ -11,6 +13,8 @@ let lastError: string | null = null;
 let lastRecordingMeta: { size: number; duration: number } | null = null;
 let pendingPublishToNostr = true;
 let pendingNoteContent: string | undefined;
+let pendingSharingMode: SharingMode = 'public';
+let pendingRecipients: Array<{ pubkey: string; name?: string; relays?: string[] }> = [];
 let recordingTabId: number | null = null;
 
 // Recording controls state (shared between popup and content script)
@@ -227,6 +231,124 @@ async function signEventDirect(
   }
 }
 
+async function nip44EncryptDirect(
+  tabId: number,
+  recipientPubkey: string,
+  plaintext: string,
+): Promise<{ ok: true; data: string } | { ok: false; error: string }> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      args: [recipientPubkey, plaintext],
+      func: (pubkey: string, text: string) => {
+        const nostr = (window as any).nostr;
+        if (!nostr) return { ok: false, error: 'No NIP-07 signer found' };
+        if (!nostr.nip44?.encrypt) return { ok: false, error: 'Signer does not support NIP-44 encryption' };
+        return Promise.race([
+          nostr.nip44.encrypt(pubkey, text).then(
+            (ct: string) => ct ? { ok: true, data: ct } : { ok: false, error: 'nip44.encrypt returned empty' },
+            (err: any) => ({ ok: false, error: String(err) }),
+          ),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: 'NIP-44 encrypt timed out (10s)' }), 10000)),
+        ]);
+      },
+    });
+    return results?.[0]?.result || { ok: false, error: 'no result' };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function probeNip44Support(tabId: number): Promise<boolean> {
+  try {
+    const results = await (browser as any).scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const nostr = (window as any).nostr;
+        return !!(nostr?.nip44?.encrypt && nostr?.nip44?.decrypt);
+      },
+    });
+    return results?.[0]?.result === true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchContacts(pubkey: string, relays: string[]): Promise<Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }>> {
+  const pool = new SimplePool();
+  try {
+    // Fetch Kind 3 (follow list)
+    const kind3 = await pool.get(relays, { kinds: [3], authors: [pubkey], limit: 1 });
+    if (!kind3) return [];
+
+    const followPubkeys = kind3.tags
+      .filter((t) => t[0] === 'p' && t[1])
+      .map((t) => t[1]);
+
+    if (followPubkeys.length === 0) return [];
+
+    // Fetch Kind 0 (profiles) for all follows — batch in groups of 50, parallelized
+    const seenPubkeys = new Set<string>();
+    const profiles: Array<{ pubkey: string; name?: string; avatar?: string; nip05?: string }> = [];
+    const batchSize = 50;
+    const batches: string[][] = [];
+    for (let i = 0; i < followPubkeys.length; i += batchSize) {
+      batches.push(followPubkeys.slice(i, i + batchSize));
+    }
+
+    const batchResults = await Promise.allSettled(
+      batches.map((batch) =>
+        pool.querySync(relays, { kinds: [0], authors: batch, limit: batch.length }),
+      ),
+    );
+
+    for (const result of batchResults) {
+      if (result.status !== 'fulfilled') continue;
+      for (const evt of result.value) {
+        if (seenPubkeys.has(evt.pubkey)) continue;
+        seenPubkeys.add(evt.pubkey);
+        try {
+          const meta = JSON.parse(evt.content);
+          profiles.push({
+            pubkey: evt.pubkey,
+            name: meta.display_name || meta.name || undefined,
+            avatar: (meta.picture && /^https?:\/\//.test(meta.picture)) ? meta.picture : undefined,
+            nip05: meta.nip05 || undefined,
+          });
+        } catch {
+          profiles.push({ pubkey: evt.pubkey });
+        }
+      }
+    }
+
+    // Include follows without profiles
+    for (const pk of followPubkeys) {
+      if (!seenPubkeys.has(pk)) {
+        profiles.push({ pubkey: pk });
+      }
+    }
+
+    return profiles;
+  } finally {
+    pool.close(relays);
+  }
+}
+
+async function fetchDmRelays(pubkey: string, relays: string[]): Promise<string[]> {
+  const pool = new SimplePool();
+  try {
+    const kind10050 = await pool.get(relays, { kinds: [10050], authors: [pubkey], limit: 1 });
+    if (!kind10050) return [];
+    return kind10050.tags
+      .filter((t) => t[0] === 'relay' && t[1])
+      .map((t) => t[1]);
+  } finally {
+    pool.close(relays);
+  }
+}
+
 export default defineBackground(() => {
   console.log('[background] service worker started');
 
@@ -251,13 +373,15 @@ export default defineBackground(() => {
           uploadResult = null;
           publishResult = null;
           lastError = null;
+          pendingSharingMode = 'public';
+          pendingRecipients = [];
           closeOffscreenDocument().catch(console.error);
           sendResponse({ ok: true });
           return false;
         }
 
         case MessageType.GET_RESULT:
-          sendResponse({ uploadResult, publishResult });
+          sendResponse({ uploadResult, publishResult, sharingMode: pendingSharingMode, recipients: pendingRecipients });
           return false;
 
         case MessageType.GET_ERROR:
@@ -548,6 +672,28 @@ export default defineBackground(() => {
           return false;
         }
 
+        case MessageType.PRIVATE_SEND_COMPLETE: {
+          const msg = message as any;
+          console.log(`[background] private send complete: ${msg.recipientCount} recipients`);
+          uploadResult = { url: '', sha256: msg.encryptedBlobHash, size: 0 };
+          publishResult = null;
+          // Store delivered pubkeys for the complete screen
+          pendingRecipients = pendingRecipients.map((r) => ({
+            ...r,
+            delivered: (msg.deliveredTo || []).includes(r.pubkey),
+          }));
+          setState('complete');
+          return false;
+        }
+
+        case MessageType.PRIVATE_SEND_ERROR: {
+          const errMsg = (message as any).error || 'Private send failed';
+          console.error('[background] private send error:', errMsg);
+          lastError = errMsg;
+          setState('error');
+          return false;
+        }
+
         case MessageType.START_UPLOAD: {
           if (message.target === 'offscreen') return false; // not for us
           // From popup "Upload & Share" — go to confirming, not directly uploading
@@ -600,6 +746,36 @@ export default defineBackground(() => {
           return true;
         }
 
+        case MessageType.NIP44_ENCRYPT: {
+          const msg = message as any;
+          if (typeof msg.recipientPubkey !== 'string' || !/^[0-9a-f]{64}$/.test(msg.recipientPubkey)) {
+            sendResponse({ ok: false, error: 'Invalid recipient pubkey' });
+            return true;
+          }
+          findScriptableTab()
+            .then(async (tabId) => {
+              if (!tabId) return sendResponse({ ok: false, error: 'No web tab available for NIP-44' });
+
+              // Remember which tab the user is on so we can switch back
+              const [callerTab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+              const callerTabId = callerTab?.id;
+
+              // Focus the signing tab so the user can see the signer popup
+              await browser.tabs.update(tabId, { active: true });
+
+              const result = await nip44EncryptDirect(tabId, msg.recipientPubkey, msg.plaintext);
+
+              // Switch back to the caller tab
+              if (callerTabId) {
+                browser.tabs.update(callerTabId, { active: true }).catch(() => {});
+              }
+
+              sendResponse(result);
+            })
+            .catch((err) => sendResponse({ ok: false, error: err.message }));
+          return true;
+        }
+
         case MessageType.GET_CONFIRM_DATA: {
           // Light probe only — never call getPublicKey() here. It opens a signer
           // popup on the recording tab that the user can't see or interact with
@@ -607,9 +783,12 @@ export default defineBackground(() => {
           // populated after the first successful signEvent.
           Promise.all([
             getSettings(),
-            findScriptableTab().then((tabId) =>
-              tabId ? probeNip07Exists(tabId) : { error: 'No web tab available' },
-            ).catch((err: any) => ({ error: err.message })),
+            findScriptableTab().then(async (tabId) => {
+              if (!tabId) return { error: 'No web tab available', nip44: false };
+              const probe = await probeNip07Exists(tabId);
+              const nip44 = 'available' in probe ? await probeNip44Support(tabId) : false;
+              return { ...probe, nip44 };
+            }).catch((err: any) => ({ error: err.message, nip44: false })),
           ])
             .then(([settings, signerResult]) => {
               const signerAvailable = 'available' in signerResult;
@@ -619,11 +798,13 @@ export default defineBackground(() => {
                 server: settings.blossomServers[0] || 'https://blossom.band',
                 relays: settings.nostrRelays,
                 publishToNostr: settings.publishToNostr,
+                defaultSharingMode: settings.defaultSharingMode,
                 fileSize: lastRecordingMeta?.size ?? 0,
                 duration: lastRecordingMeta?.duration ?? 0,
                 npub,
                 signerAvailable,
                 bridgeError: signerAvailable ? null : bridgeError,
+                nip44Supported: (signerResult as any).nip44 === true,
               });
             })
             .catch((err) => {
@@ -635,18 +816,31 @@ export default defineBackground(() => {
 
         case MessageType.CONFIRM_UPLOAD: {
           const msg = message as any;
-          pendingPublishToNostr = msg.publishToNostr !== false;
+          const sharingMode: SharingMode = msg.sharingMode || 'public';
+          pendingSharingMode = sharingMode;
+          pendingPublishToNostr = sharingMode === 'public';
           pendingNoteContent = msg.noteContent;
+          pendingRecipients = msg.recipients || [];
+
           setState('uploading');
           getSettings().then((settings) => {
             const server = msg.serverOverride || settings.blossomServers[0];
-            return ensureOffscreenDocument().then(() =>
-              browser.runtime.sendMessage({
-                type: MessageType.START_UPLOAD,
-                target: 'offscreen',
-                server,
-              }),
-            );
+            return ensureOffscreenDocument().then(() => {
+              if (sharingMode === 'private') {
+                return browser.runtime.sendMessage({
+                  type: MessageType.SEND_PRIVATE,
+                  target: 'offscreen',
+                  server,
+                  recipients: pendingRecipients,
+                });
+              } else {
+                return browser.runtime.sendMessage({
+                  type: MessageType.START_UPLOAD,
+                  target: 'offscreen',
+                  server,
+                });
+              }
+            });
           }).catch((err) => {
             console.error('[background] confirm upload failed:', err);
             lastError = err instanceof Error ? err.message : String(err);
@@ -766,6 +960,50 @@ export default defineBackground(() => {
         case MessageType.OPEN_SETTINGS: {
           browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
           return false;
+        }
+
+        case MessageType.FETCH_CONTACTS: {
+          getSettings()
+            .then((settings) => {
+              if (!settings.nostrPubkey) return sendResponse({ contacts: [] });
+              return fetchContacts(settings.nostrPubkey, settings.nostrRelays)
+                .then((contacts) => sendResponse({ contacts }));
+            })
+            .catch((err) => {
+              console.error('[background] FETCH_CONTACTS error:', err);
+              sendResponse({ contacts: [] });
+            });
+          return true;
+        }
+
+        case MessageType.RESOLVE_NIP05: {
+          const identifier = (message as any).identifier;
+          // Validate format to prevent SSRF via internal hostnames/IPs
+          if (typeof identifier !== 'string' || !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(identifier)) {
+            sendResponse({ error: 'Invalid NIP-05 identifier format' });
+            return true;
+          }
+          (async () => {
+            try {
+              const profile = await queryProfile(identifier);
+              sendResponse(profile ? { pubkey: profile.pubkey, relays: profile.relays } : { error: 'Not found' });
+            } catch (err: any) {
+              sendResponse({ error: err.message });
+            }
+          })();
+          return true;
+        }
+
+        case MessageType.FETCH_DM_RELAYS: {
+          const pubkey = (message as any).pubkey;
+          getSettings()
+            .then((settings) => fetchDmRelays(pubkey, settings.nostrRelays))
+            .then((relays) => sendResponse({ relays }))
+            .catch((err) => {
+              console.error('[background] FETCH_DM_RELAYS error:', err);
+              sendResponse({ relays: [] });
+            });
+          return true;
         }
 
         default:
