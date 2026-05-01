@@ -27,7 +27,7 @@
     "wxt": "^0.20.18"
   },
   "dependencies": {
-    "blossom-client-sdk": "^4.1.0",
+    "blossom-client-sdk": "^5.0.0",
     "mediabunny": "^1.39.0",
     "nostr-tools": "^2.23.3"
   }
