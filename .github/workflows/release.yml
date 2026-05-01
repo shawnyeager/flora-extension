@@ -29,7 +29,7 @@ jobs:
         run: echo "path=$(ls .output/*.zip)" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ${{ steps.zip.outputs.path }}
           generate_release_notes: true
